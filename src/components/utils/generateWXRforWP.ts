@@ -1,6 +1,7 @@
 import { js2xml } from "xml-js";
 
 const generateWXR = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   jsonData: any,
   WPsiteName: string,
   WpsiteAddress: string
@@ -24,6 +25,7 @@ const generateWXR = (
     return html;
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const posts = data.map((post: any) => {
     const postId = post.id + 1000; // Adjust post ID to avoid conflicts
     const imageId = post.id + 2000; // Adjust image ID
@@ -108,6 +110,7 @@ const generateWXR = (
           "wp:author_last_name": "",
         },
         "wp:post_type": "post",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         item: posts.map((post: { post: any; attachment: any }) => {
           return {
             ...post.post,

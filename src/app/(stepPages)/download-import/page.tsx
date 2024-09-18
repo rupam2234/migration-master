@@ -13,6 +13,7 @@ const DownloadImport = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isReadyForDownload, setIsReadyForDownload] = useState(false);
   const [error, setError] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [jsonData, setJsonData] = useState<any>();
   const [siteName, setSiteName] = useState("");
   const [siteAddress, setSiteAddress] = useState("");

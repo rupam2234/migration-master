@@ -92,7 +92,7 @@ const ConvertJson = () => {
           Select one of the platforms below to generate the import file for. We
           already have the export data and can convert it into a format
           compatible with your chosen platform. Alternatively, you can download
-          the raw JSON file we've obtained from Shopify.
+          the raw JSON file we&apos;ve obtained from Shopify.
         </p>
       </div>
       <div className="flex flex-col gap-4 mt-9 items-center justify-center">
@@ -125,8 +125,8 @@ const ConvertJson = () => {
           {selectedSVG && (
             <div className="mt-4 text-[14px] text-center">
               <p>
-                You've selected {selectedSVG}. On the next page, you'll download
-                the {selectedSVG} import file.
+                You&apos;ve selected {selectedSVG}. On the next page,
+                you&apos;ll download the {selectedSVG} import file.
               </p>
             </div>
           )}

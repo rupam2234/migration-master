@@ -22,7 +22,7 @@ const FirstStep = () => {
   // Update sessionStorage whenever shopName changes
   useEffect(() => {
     sessionStorage.setItem("shopName", shopName);
-  }, []);
+  }, [shopName]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();

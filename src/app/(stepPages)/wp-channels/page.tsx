@@ -27,7 +27,7 @@ const WPChannel = () => {
   useEffect(() => {
     sessionStorage.setItem("WPsiteName", siteName);
     sessionStorage.setItem("WpsiteAddress", siteAddress);
-  }, []);
+  },);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); // This line now prevents the page reload.
