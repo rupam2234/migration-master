@@ -77,7 +77,12 @@ const generateWXR = (
               "wp:postmeta": [
                 {
                   "wp:meta_key": "_wp_attached_file",
-                  "wp:meta_value": post.image.src.split("/").pop() || "",
+                  "wp:meta_value": JSON.stringify({
+                    file: post.image.src.split("/").pop() || "",
+                    width: post.image.width,
+                    height: post.image.height,
+                    url: post.image.src,
+                  }),
                 },
               ],
             }
