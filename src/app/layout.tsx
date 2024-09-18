@@ -57,7 +57,7 @@ export default function RootLayout({
                 width={16}
                 height={16}
               />
-              Copywrite {currentYear} | All Rights Reserved.
+              © Copyright {currentYear} | All Rights Reserved.
             </p>
             <a
               className="flex items-center gap-2 hover:underline hover:underline-offset-4"
