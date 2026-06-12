@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import Shopify from "shopify-api-node";
 
 export async function POST(req: Request) {
-  try {
-    // Parse the request body
-    const body = await req.json();
-    const { shopName, apiKey, apiPassword } = body;
 
-    // Initialize the Shopify API with dynamic credentials
+  const { shopName, apiKey, apiPassword } = await req.json();
+
+  if (!shopName || !apiKey || !apiPassword) {
+    return NextResponse.json({ message: "Missing Request Body" }, { status: 400 })
+  }
+
+  try {
     const shopify = new Shopify({
       shopName,
       apiKey,

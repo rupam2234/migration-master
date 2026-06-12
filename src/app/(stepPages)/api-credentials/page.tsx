@@ -55,53 +55,52 @@ const SecondStep = () => {
       return;
     }
 
-    if (!apiPassword.includes("shpat_")) {
-      setError(
-        "The Shopify Admin API access token should start with the 'shpat_'. Please recheck."
-      );
+    // if (!apiPassword.includes("shpat_")) {
+    //   setError(
+    //     "The Shopify Admin API access token should start with the 'shpat_'. Please recheck."
+    //   );
+    //   return;
+    // } else {
+    setError("");
+
+    if (sessionStorage.getItem("resultJson")) {
+      router.push("/convert");
       return;
     } else {
-      setError("");
+      setLoading(true); // Start loading
 
-      if (sessionStorage.getItem("resultJson")) {
+      // Save shopName to sessionStorage so it persists on the next page
+      sessionStorage.setItem("apiKey", apiKey);
+      sessionStorage.setItem("AccessToken", apiPassword);
+
+      // Send the credentials to the server
+      const response = await fetch("/api/fetchPosts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopName, apiKey, apiPassword }),
+      });
+
+      if (response.ok) {
+        // Handle JSON response
+        const data = await response.json();
+        sessionStorage.setItem("resultJson", JSON.stringify(data));
+
+        // // Process the JSON data (e.g., generate a downloadable file or display it)
+        // const blob = new Blob([JSON.stringify(data, null, 2)], {
+        //   type: "application/json",
+        // });
+        // const url = URL.createObjectURL(blob);
+
+        // // Create a download link for the JSON file
+        // const a = document.createElement("a");
+        // a.href = url;
+        // a.download = "blogPosts.json";
+        // a.click();
+
         router.push("/convert");
-        return;
+        setLoading(false); // Stop loading
       } else {
-        setLoading(true); // Start loading
-
-        // Save shopName to sessionStorage so it persists on the next page
-        sessionStorage.setItem("apiKey", apiKey);
-        sessionStorage.setItem("AccessToken", apiPassword);
-
-        // Send the credentials to the server
-        const response = await fetch("/api/fetchPosts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shopName, apiKey, apiPassword }),
-        });
-
-        if (response.ok) {
-          // Handle JSON response
-          const data = await response.json();
-          sessionStorage.setItem("resultJson", JSON.stringify(data));
-
-          // // Process the JSON data (e.g., generate a downloadable file or display it)
-          // const blob = new Blob([JSON.stringify(data, null, 2)], {
-          //   type: "application/json",
-          // });
-          // const url = URL.createObjectURL(blob);
-
-          // // Create a download link for the JSON file
-          // const a = document.createElement("a");
-          // a.href = url;
-          // a.download = "blogPosts.json";
-          // a.click();
-
-          router.push("/convert");
-          setLoading(false); // Stop loading
-        } else {
-          console.log("Failed to fetch blog posts");
-        }
+        console.log("Failed to fetch blog posts");
       }
     }
   };

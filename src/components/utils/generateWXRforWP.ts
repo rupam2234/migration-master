@@ -126,9 +126,6 @@ const generateWXR = (
     },
   };
 
-  // Debugging: log wxrData before converting to XML
-  console.log(JSON.stringify(wxrData, null, 2));
-
   console.log("file conversion complete");
 
   return js2xml(wxrData, { compact: true, ignoreComment: true, spaces: 4 });

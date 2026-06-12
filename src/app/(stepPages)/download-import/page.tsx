@@ -18,6 +18,7 @@ const DownloadImport = () => {
   const [siteName, setSiteName] = useState("");
   const [siteAddress, setSiteAddress] = useState("");
   const [wxrUrl, setWxrUrl] = useState<string | null>(null);
+  const [zipUrl, setZipUrl] = useState<string | null>(null); // Store ZIP file URL
   const [showShareCard, setShowShareCard] = useState(false);
 
   useEffect(() => {
@@ -38,24 +39,45 @@ const DownloadImport = () => {
     setIsReadyForDownload(false);
 
     try {
+      // Step 1: Call the API to download images and create a ZIP
+      const response = await fetch("/api/processImages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ jsonData }), // Ensure jsonData is defined and valid
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const { zipPath } = result;
+
+      // Set ZIP download URL
+      const zipDownloadUrl = `${window.location.origin}${zipPath}`;
+      setZipUrl(zipDownloadUrl);
+
       // Simulate progress update
       const totalSteps = 100;
-      for (let i = 0; i <= totalSteps; i++) {
+      for (let i = 50; i <= totalSteps; i++) {
         await new Promise((resolve) => setTimeout(resolve, 50));
         setProgress((i / totalSteps) * 100);
       }
 
-      // Generate WXR data
+      // Step 2: Generate WXR data
       const wxrData = generateWXR(jsonData, siteName, siteAddress);
 
-      // Create a Blob from the WXR data
-      const blob = new Blob([wxrData], { type: "application/xml" });
-      const url = URL.createObjectURL(blob);
-      setWxrUrl(url); // Store the blob URL for downloading
-      setIsReadyForDownload(true); // File is ready to download
+      // Create a Blob from the WXR data and set the download URL
+      const wxrBlob = new Blob([wxrData], { type: "application/xml" });
+      const wxrDownloadUrl = URL.createObjectURL(wxrBlob);
+      setWxrUrl(wxrDownloadUrl);
+
+      setIsReadyForDownload(true);
     } catch (error) {
-      console.error("Failed to generate WXR file", error);
-      setError("Failed to generate WXR file");
+      console.error("Failed to generate files", error);
+      setError("Failed to generate files");
     } finally {
       setIsGenerating(false);
     }
@@ -77,6 +99,25 @@ const DownloadImport = () => {
     }
   };
 
+  const handleDownloadZip = async () => {
+    if (zipUrl) {
+      const a = document.createElement("a");
+      a.href = zipUrl;
+      a.download = "featured_images.zip";
+      a.click();
+      URL.revokeObjectURL(zipUrl);
+
+      // Cleanup the ZIP file on the server after download
+      try {
+        await fetch("/api/cleanup", {
+          method: "POST",
+        });
+      } catch (error) {
+        console.error("Failed to clean up ZIP file on server", error);
+      }
+    }
+  };
+
   const handleCancel = () => {
     setShowShareCard(false); // Hide the share card without sharing
   };
@@ -87,12 +128,26 @@ const DownloadImport = () => {
       <div className="flex flex-col items-center justify-center mt-14">
         {!isReadyForDownload ? (
           <h2 className="font-medium text-sm text-center">
-            Let&apos;s generate your WordPress XML file. Shall we?
+            Let&apos;s generate your WordPress XML file and post thumbnails.
+            This process involves fetching and preparing a ZIP file of featured
+            images, so it might take a little time. Please be patient while we
+            handle everything for you.
           </h2>
         ) : (
-          <h2 className="font-medium text-sm text-center">
-            Your import file is READY. Download and import to WordPress :D
-          </h2>
+          <>
+            <h2 className="font-medium text-sm text-center">
+              Your import files are ready!
+            </h2>
+            <p className="font-normal mt-5 text-[13px] text-center">
+              Please download both the XML and ZIP files. Note that the ZIP file
+              will be available for download for only 1 hour, so make sure to
+              save it to your local files promptly. First, upload the ZIP file
+              to your WordPress media library. After that, use the WordPress
+              importer to upload the XML file. This will ensure that the
+              featured images are automatically assigned to the respective
+              posts.
+            </p>
+          </>
         )}
         <div></div>
       </div>
@@ -123,16 +178,27 @@ const DownloadImport = () => {
             onClick={handleGenerate}
             disabled={isGenerating} // Disable button while generating
           >
-            {isGenerating ? "Generating..." : "Generate WordPress Import"}
+            {isGenerating ? "Generating..." : "Generate WordPress Imports"}
           </Button>
         ) : (
-          <Button
-            className="px-10 py-2 flex items-center space-x-2 group bg-blue-500 hover:bg-blue-400"
-            onClick={handleDownload}
-          >
-            <span>Download WordPress XML</span>
-            <DownloadIcon className="w-6 h-4" />
-          </Button>
+          <>
+            <Button
+              className="px-10 py-2 flex items-center space-x-2 group bg-blue-500 hover:bg-blue-400"
+              onClick={handleDownload}
+            >
+              <span>Download WordPress XML</span>
+              <DownloadIcon className="w-6 h-4" />
+            </Button>
+            {zipUrl && (
+              <Button
+                className="px-10 py-2 flex items-center space-x-2 group bg-green-500 hover:bg-green-400"
+                onClick={handleDownloadZip}
+              >
+                <span>Download Featured Images ZIP</span>
+                <DownloadIcon className="w-6 h-4" />
+              </Button>
+            )}
+          </>
         )}
       </div>
       <div className="min-h-[40px] flex flex-row items-center justify-center text-center text-[13px] text-red-500 mt-7">
