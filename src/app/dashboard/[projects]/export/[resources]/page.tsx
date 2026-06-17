@@ -5,6 +5,7 @@ import { Lock, Check } from "lucide-react";
 import { ResourceKey } from "@/app";
 import { useProjectContext } from "@/context";
 import { useParams } from "next/navigation";
+import { generateWXR } from "@/lib";
 
 const PREVIEW_LIMIT = 7;
 const CELL_TRUNCATE_LENGTH = 60;
@@ -71,49 +72,9 @@ export default function ExportResources() {
       ? `${text.slice(0, CELL_TRUNCATE_LENGTH)}…`
       : text;
 
-  const downloadBlob = (content: string, mime: string, filename: string) => {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // Only ever export from `visible`, and only the rows the user selected
-  // (or all visible rows if nothing is selected) — locked rows never enter
-  // the export path until billing/business logic is integrated.
-  const exportRows =
-    selected.size > 0 ? visible.filter((_, i) => selected.has(i)) : visible;
-
-  const handleExportJSON = () =>
-    downloadBlob(
-      JSON.stringify(exportRows, null, 2),
-      "application/json",
-      `${params.resources}-preview.json`,
-    );
-
-  const handleExportCSV = () => {
-    if (columns.length === 0) return;
-    const header = columns.join(",");
-    const rows = exportRows.map((r) =>
-      columns
-        .map((c) => {
-          const val = formatCell((r as Record<string, unknown>)[c]).replace(
-            /"/g,
-            '""',
-          );
-          return `"${val}"`;
-        })
-        .join(","),
-    );
-    downloadBlob(
-      [header, ...rows].join("\n"),
-      "text/csv",
-      `${params.resources}-preview.csv`,
-    );
-  };
+  const handleGenerateWordPressImport = () => {
+    // const wxr = generateWXR(key.toLowerCase(), data, );
+  }
 
   if (!data) {
     return (
@@ -129,7 +90,7 @@ export default function ExportResources() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-sm font-semibold capitalize text-primary/80">
-          {params.resources as string} Export
+          Exported {params.resources as string} From Shopify
           {selected.size > 0 && (
             <span className="ml-2 text-xs font-normal text-gray-400">
               ({selected.size} selected)
@@ -137,17 +98,9 @@ export default function ExportResources() {
           )}
         </h1>
         <div className="flex gap-2">
-          <button
-            onClick={handleExportCSV}
-            className="px-3 py-1.5 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
-          >
-            Export {selected.size > 0 ? "Selected" : "Preview"} CSV
-          </button>
-          <button
-            onClick={handleExportJSON}
-            className="px-3 py-1.5 text-sm rounded-md bg-black text-white hover:bg-gray-800"
-          >
-            Export {selected.size > 0 ? "Selected" : "Preview"} JSON
+          {/* Generate export buttons */}
+          <button className="rounded-sm text-sm px-2 py-1 hover:bg-blue-600/60 bg-blue-600/80 text-white" onClick={handleGenerateWordPressImport}>
+            Generate WordPress Import
           </button>
         </div>
       </div>
