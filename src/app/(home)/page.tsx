@@ -1,5 +1,5 @@
-import FirstStep from "../(stepPages)/firstPage";
+import { Main } from "../index";
 
 export default function Home() {
-  return <FirstStep />;
+  return <Main />;
 }
