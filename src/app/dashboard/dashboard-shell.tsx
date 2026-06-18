@@ -31,12 +31,12 @@ export function DashboardShell({
     {
       icon: <ArrowRightLeft size={ICON_SIZE} />,
       link: activeProject ? `/dashboard/${activeProject}` : "#",
-      title: "Export Data",
+      title: "Shopify Export",
     },
     {
       icon: <Settings size={ICON_SIZE} />,
-      link: activeProject ? `/dashboard/${activeProject}/#` : "#",
-      title: "Settings",
+      link: activeProject ? `/dashboard/${activeProject}/import-settings` : "#",
+      title: "WP Import Settings",
     },
   ];
 

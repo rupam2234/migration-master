@@ -148,7 +148,7 @@ export default function Dashboard() {
           Export Shopify Contents
         </h2>
 
-        <p className="mt-1 text-xs text-primary/50">
+        <p className="mt-1 text-sm text-primary/50">
           Fetch the latest data for each resource below.
         </p>
       </div>

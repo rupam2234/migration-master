@@ -1,14 +1,16 @@
-import { generateWXR, WXRConfig, WXRResource } from "@/lib/wxr_generator";
+import { generateWXR, WXRConfig } from "@/lib/wxr_generator";
 import { NextRequest, NextResponse } from "next/server";
 import { Resurces } from "../fetch/route";
 
-const WXR_RESOURCES: WXRResource[] = ["images", "blogs", "articles", "pages"];
+const WXR_RESOURCES: Resurces[] = ["images", "blogs", "articles", "pages"];
 
-const FILENAME_MAP: Record<WXRResource, string> = {
+const FILENAME_MAP: Record<Resurces, string> = {
     images: "shopify-media.xml",
     blogs: "shopify-categories.xml",
     articles: "shopify-posts.xml",
     pages: "shopify-pages.xml",
+    orders: "shopify-orders.xml",
+    single_article: "shopify-single.xml"
 }; // for wordpress
 
 export interface ExportProps {
@@ -18,7 +20,7 @@ export interface ExportProps {
 export async function POST(req: NextRequest, { params }: { params: { resources: Resurces } }) {
     const { resources } = params;
 
-    if (!WXR_RESOURCES.includes(resources as WXRResource)) {
+    if (!WXR_RESOURCES.includes(resources as Resurces)) {
         return NextResponse.json(
             { message: `WXR export not supported for "${resources}". Supported: ${WXR_RESOURCES.join(", ")}` },
             { status: 400 }
@@ -58,8 +60,8 @@ export async function POST(req: NextRequest, { params }: { params: { resources: 
             defaultAuthor: "admin",
         };
 
-        const xml = generateWXR(resources as WXRResource, data, cfg);
-        const filename = FILENAME_MAP[resources as WXRResource];
+        const xml = generateWXR(resources as Resurces, data, cfg);
+        const filename = FILENAME_MAP[resources as Resurces];
 
         return new NextResponse(xml, {
             status: 200,

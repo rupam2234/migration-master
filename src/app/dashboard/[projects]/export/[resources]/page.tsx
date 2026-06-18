@@ -1,29 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Lock, Check } from "lucide-react";
+import { Lock, Check, LoaderIcon } from "lucide-react";
 import { ResourceKey } from "@/app";
 import { useProjectContext } from "@/context";
 import { useParams } from "next/navigation";
-import { generateWXR } from "@/lib";
+import { WPimportProps } from "@/app/api/wordpress/[resources]/import/route";
+import JSZip from "jszip";
 
 const PREVIEW_LIMIT = 7;
 const CELL_TRUNCATE_LENGTH = 60;
 
 export default function ExportResources() {
   const params = useParams();
-  const { shopifyData } = useProjectContext();
-
+  const { shopifyData, wpImportSettings } = useProjectContext();
   const key = (params.resources as string).toUpperCase() as ResourceKey;
-  const data = shopifyData[key];
+  const selectedData = shopifyData[key];
 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState<boolean>(false);
 
   const records = useMemo(() => {
-    if (!data) return [];
-    return Array.isArray(data) ? data : [data];
-  }, [data]);
+    if (!selectedData) return [];
+    return Array.isArray(selectedData) ? selectedData : [selectedData];
+  }, [selectedData]);
 
   const columns = useMemo(() => {
     const keys = new Set<string>();
@@ -41,7 +42,8 @@ export default function ExportResources() {
 
   const visible = filtered.slice(0, PREVIEW_LIMIT);
   const hiddenCount = Math.max(filtered.length - PREVIEW_LIMIT, 0);
-  // Fake rows just to give the blurred section some visual bulk — never real data
+
+  // Fake rows just to give the blurred section
   const placeholderRowCount = Math.min(hiddenCount, 4);
 
   const toggleRow = (i: number) => {
@@ -72,11 +74,70 @@ export default function ExportResources() {
       ? `${text.slice(0, CELL_TRUNCATE_LENGTH)}…`
       : text;
 
-  const handleGenerateWordPressImport = () => {
-    // const wxr = generateWXR(key.toLowerCase(), data, );
-  }
+  const handleGenerateWordPressImport = async () => {
+    if (!key) return;
 
-  if (!data) {
+    setLoading(true);
+
+    try {
+      const zip = new JSZip();
+      let totalParts = 1;
+
+      for (let part = 1; part <= totalParts; part++) {
+        const data: WPimportProps = {
+          cfg: wpImportSettings,
+          data: selectedData as any,
+          part,
+        };
+
+        const res = await fetch(`/api/wordpress/${key.toLowerCase()}/import`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(
+            error.message ?? "Something went wrong generating WordPress import",
+          );
+        }
+
+        // First response tells us how many parts to expect.
+        totalParts = Number(res.headers.get("X-Total-Parts")) || 1;
+        const filename =
+          res.headers.get("X-Filename") ??
+          `${key}-wordpress-import-part${part}.xml`;
+
+        const xmlText = await res.text();
+        zip.file(filename, xmlText);
+      }
+
+      // Bundle every part into a single zip and trigger ONE download.
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = window.URL.createObjectURL(zipBlob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${key}-wordpress-import.zip`;
+
+      document.body.appendChild(a);
+      a.click();
+
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error(
+        error.message ?? "Something went wrong generating WordPress import",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!selectedData) {
     return (
       <div className="p-8 text-center text-gray-500">
         No data found for &quot;{params.resources as string}&quot;.
@@ -89,18 +150,28 @@ export default function ExportResources() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-sm font-semibold capitalize text-primary/80">
+        <h2 className="text-sm font-semibold capitalize text-primary/80">
           Exported {params.resources as string} From Shopify
           {selected.size > 0 && (
             <span className="ml-2 text-xs font-normal text-gray-400">
               ({selected.size} selected)
             </span>
           )}
-        </h1>
+        </h2>
         <div className="flex gap-2">
           {/* Generate export buttons */}
-          <button className="rounded-sm text-sm px-2 py-1 hover:bg-blue-600/60 bg-blue-600/80 text-white" onClick={handleGenerateWordPressImport}>
-            Generate WordPress Import
+          <button
+            className="rounded-sm text-sm px-2 py-1 hover:bg-blue-600/70 bg-blue-600/80 text-white"
+            onClick={handleGenerateWordPressImport}
+          >
+            {loading ? (
+              <span className="flex items-center gap-1">
+                Generating File...
+                <LoaderIcon className="animate-spin" size={16} />
+              </span>
+            ) : (
+              "Generate WordPress Import"
+            )}
           </button>
         </div>
       </div>

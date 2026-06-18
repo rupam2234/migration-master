@@ -9,7 +9,13 @@
  *   2. blogs    → Categories
  *   3. articles → Posts  (linked to categories by slug)
  *   4. pages    → Pages
+ *
+ * Large catalogs can be split into chunked WXR files via
+ * generateWXRChunks() so each individual import stays well within
+ * typical PHP max_execution_time / memory_limit constraints.
  */
+
+import { Resurces } from "@/app/api/shopify/[resources]/fetch/route";
 
 
 export interface ShopifyImage {
@@ -96,6 +102,9 @@ function toMySQLDate(iso: string): string {
  * Derive a numeric post ID from a Shopify GID.
  * e.g. "gid://shopify/Article/123456" → 123456
  * Falls back to a hash of the full GID string for safety.
+ *
+ * Because this is derived directly from the Shopify GID, IDs stay
+ * globally unique across chunked exports with no extra bookkeeping.
  */
 function gidToId(gid: string): number {
     const match = gid.match(/\/(\d+)$/);
@@ -213,12 +222,17 @@ export function generateImagesWXR(
  * Generates a WXR file containing all Shopify blogs as
  * WordPress categories. Import this BEFORE articles so the
  * categories exist for posts to reference.
+ *
+ * @param startTermId - first wp:term_id to assign (default 1).
+ *   Pass an offset when generating multiple chunked blog files so
+ *   term IDs stay unique across files.
  */
 export function generateBlogsWXR(
     blogs: ShopifyBlog[],
-    cfg: WXRConfig
+    cfg: WXRConfig,
+    startTermId: number = 1
 ): string {
-    let termIdCounter = 1;
+    let termIdCounter = startTermId;
 
     const categoryBlocks = blogs
         .map((blog) => {
@@ -355,7 +369,6 @@ export function generatePagesWXR(
 }
 
 
-export type WXRResource = "images" | "blogs" | "articles" | "pages";
 
 /**
  * Single entry point — pass the resource name and its data array,
@@ -367,7 +380,7 @@ export type WXRResource = "images" | "blogs" | "articles" | "pages";
  * fs.writeFileSync("images.xml", xml);
  */
 export function generateWXR(
-    resource: WXRResource,
+    resource: Resurces,
     data: any[],
     cfg: WXRConfig
 ): string {
@@ -383,4 +396,87 @@ export function generateWXR(
         default:
             throw new Error(`Unknown WXR resource: ${resource}`);
     }
+}
+
+/** Split an array into fixed-size batches, preserving order. */
+function chunkArray<T>(items: T[], size: number): T[][] {
+    if (size <= 0) return [items];
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size));
+    }
+    return chunks;
+}
+
+export interface WXRChunk {
+    /** Suggested filename, e.g. "shopify-images-part1.xml" */
+    filename: string;
+    xml: string;
+    itemCount: number;
+}
+
+/**
+ * Default batch sizes per resource type, tuned for typical shared
+ * hosting PHP limits (max_execution_time / memory_limit):
+ *
+ *  - images: kept small because WordPress downloads each remote
+ *    media URL synchronously during import — this is the slowest
+ *    step per item and the most likely to trigger a timeout.
+ *  - blogs: categories are usually few, chunking is rarely needed.
+ *  - articles/pages: cheap DB inserts with no external fetch, so
+ *    larger batches are safe.
+ *
+ * Override per-call with the chunkSize argument if your host allows
+ * more (or needs less).
+ */
+const DEFAULT_CHUNK_SIZE: Record<Resurces, number> = {
+    images: 75,
+    blogs: 500,
+    articles: 250,
+    pages: 250,
+    orders: 200,
+    single_article: 1
+};
+
+/**
+ * Same as generateWXR, but splits the data into multiple WXR files
+ * so each individual WordPress import stays fast and safely within
+ * execution-time / memory limits. Import the resulting files in
+ * order (part1, part2, ...) via Tools → Import → WordPress.
+ *
+ * @example
+ * const chunks = generateWXRChunks("images", shopifyImages, cfg);
+ * for (const { filename, xml } of chunks) {
+ *   fs.writeFileSync(filename, xml);
+ * }
+ */
+export function generateWXRChunks(
+    resource: Resurces,
+    data: any[],
+    cfg: WXRConfig,
+    chunkSize?: number
+): WXRChunk[] {
+    const size = chunkSize ?? DEFAULT_CHUNK_SIZE[resource] ?? 100;
+    const batches = chunkArray(data, size);
+    const multiPart = batches.length > 1;
+
+    let termIdOffset = 0; // only used for blogs, to keep term_id unique
+
+    return batches.map((batch, i) => {
+        const partLabel = multiPart ? `-part${i + 1}` : "";
+        let xml: string;
+
+        if (resource === "blogs") {
+            xml = generateBlogsWXR(batch as ShopifyBlog[], cfg, termIdOffset + 1);
+            termIdOffset += batch.length;
+        } else {
+            xml = generateWXR(resource, batch, cfg);
+        }
+
+        return {
+            filename: `shopify-${resource}${partLabel}.xml`,
+            xml,
+            itemCount: batch.length,
+        };
+    });
 }

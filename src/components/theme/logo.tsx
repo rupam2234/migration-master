@@ -1,15 +1,11 @@
+import styles from "@/app/(home)/style.module.css";
 import Link from "next/link";
 
 export function Logo() {
   return (
-    <Link href={"/"} className="my-2">
-      <img
-        src={"/images/Migration-Master_logo.png"}
-        alt="Migration-Master_logo"
-        fetchPriority="high"
-        width={150}
-        height={60}
-      />
+    <Link className={styles["mm-logo"]} href={"/"}>
+      <span className={styles["mm-logo-mark"]}>Migration Master</span>
+      <span className={styles["mm-logo-tag"]}>/ shopify → wp</span>
     </Link>
   );
 }
