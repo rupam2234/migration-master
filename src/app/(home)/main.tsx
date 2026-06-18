@@ -19,7 +19,7 @@ const TIERS = [
     name: "Migration",
     range: "Up to 20,000 items",
     rate: 0.15,
-    minimum: 50,
+    minimum: 0,
     icon: Package,
     blurb: "For a single store's blog, pages, and media library.",
     features: [
