@@ -19,13 +19,13 @@ const TIERS = [
     name: "Migration",
     range: "Up to 20,000 items",
     rate: 0.15,
-    minimum: 0,
+    minimum: 50,
     icon: Package,
     blurb: "For a single store's blog, pages, and media library.",
     features: [
       "Standard chunked WXR export",
       "Itemized manifest before you pay",
-      "Email support, 1 business day",
+      "Email support",
     ],
   },
 ];
