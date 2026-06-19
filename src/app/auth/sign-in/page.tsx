@@ -45,6 +45,7 @@ export default function SignIn() {
       }
 
       setMessage({ text: "Signed in. Redirecting...", type: "success" });
+      setLoading(false);
       router.push("/dashboard");
     } catch {
       setMessage({ text: "Network error. Please try again.", type: "error" });
