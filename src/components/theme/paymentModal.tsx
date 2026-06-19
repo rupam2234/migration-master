@@ -134,6 +134,13 @@ function CheckoutForm({ price, onSuccess, onCancel }: CheckoutFormProps) {
     const { error } = await stripe.confirmPayment({
       elements,
       redirect: "if_required",
+      confirmParams: {
+        payment_method_data: {
+          billing_details: {
+            phone: "",
+          },
+        },
+      },
     });
 
     if (error) {
@@ -202,10 +209,9 @@ function CheckoutForm({ price, onSuccess, onCancel }: CheckoutFormProps) {
           wallets: { link: "never", googlePay: "auto" },
           fields: {
             billingDetails: {
-              name: "never",
-              email: "never",
+              name: "auto",
+              email: "auto",
               phone: "never",
-              address: "never",
             },
           },
         }}
