@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, ShoppingBag } from "lucide-react";
 
 export default function SignIn() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -46,7 +44,7 @@ export default function SignIn() {
 
       setMessage({ text: "Signed in. Redirecting...", type: "success" });
       setLoading(false);
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch {
       setMessage({ text: "Network error. Please try again.", type: "error" });
       setLoading(false);
