@@ -12,7 +12,7 @@ export default function AuthLayout({
 }) {
   return (
     <>
-      <Header />
+      <Header nav={false} />
       {children}
     </>
   );

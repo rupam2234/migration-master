@@ -28,8 +28,8 @@ export default function Dashboard() {
   return (
     <div className="max-w-xl">
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-gray-50">
-          <MousePointerClick className="h-[18px] w-[18px] text-gray-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-primary">
+          <MousePointerClick className="h-[18px] w-[18px] text-primary-foreground" />
         </div>
         <div>
           <p className="text-lg font-medium">Select a project</p>

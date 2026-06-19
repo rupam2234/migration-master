@@ -60,13 +60,17 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[160px] rounded-sm border border-primary/10 bg-white py-0.5">
+        <div
+          className="absolute left-0 top-full z-10 mt-1 w-full min-w-[160px] 
+          rounded-sm border border-primary/10 bg-primary/80 
+          py-0.5"
+        >
           {allProjects?.map((project) => (
             <button
               key={project}
               type="button"
               onClick={() => selectProject(project)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-semibold text-primary/80 hover:bg-primary/5"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-semibold text-primary-foreground/80 hover:bg-primary/5"
             >
               <span className="truncate">{project}</span>
             </button>

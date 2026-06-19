@@ -18,8 +18,8 @@ const TIERS = [
   {
     name: "Migration",
     range: "Up to 20,000 items",
-    rate: 0.15,
-    minimum: 50,
+    rate: 0.2,
+    minimum: 5,
     icon: Package,
     blurb: "For a single store's blog, pages, and media library.",
     features: [
@@ -122,6 +122,13 @@ const FAQS = [
   },
 ];
 
+const NAV_ITEMS = [
+  { link: "#how-it-works", title: "How it works" },
+  { link: "#what-moves", title: "What moves" },
+  { link: "#pricing", title: "Pricing" },
+  { link: "#faq", title: "FAQ" },
+];
+
 export default function Main() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [itemCount, setItemCount] = useState(0);
@@ -134,7 +141,7 @@ export default function Main() {
 
   return (
     <div className={styles["mm-root"]}>
-      <Header />
+      <Header nav items={NAV_ITEMS} />
 
       <div>
         <section className={`${styles["mm-shell"]} ${styles["mm-hero"]}`}>
