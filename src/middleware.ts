@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export default function Middleware(req: NextRequest) {
+export default function middleware(req: NextRequest) {
     // check cookie for log in status
     const token = req.cookies.get("session")?.value;
 
