@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, ShoppingBag } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,7 @@ export default function SignIn() {
     text: string;
     type: "error" | "success";
   } | null>(null);
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +46,7 @@ export default function SignIn() {
 
       setMessage({ text: "Signed in. Redirecting...", type: "success" });
       setLoading(false);
-      window.location.href = "/dashboard";
+      router.push("/dashboard");
     } catch {
       setMessage({ text: "Network error. Please try again.", type: "error" });
       setLoading(false);

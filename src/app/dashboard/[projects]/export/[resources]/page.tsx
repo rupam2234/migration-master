@@ -94,7 +94,7 @@ export default function ExportResources() {
       ? `${text.slice(0, CELL_TRUNCATE_LENGTH)}…`
       : text;
 
-  const handleGenerateWordPressImport = async () => {
+  const generateWordpressImport = async () => {
     if (!key) return;
 
     // Export only selected records
@@ -147,6 +147,27 @@ export default function ExportResources() {
         error.message ?? "Something went wrong generating WordPress import",
       );
     }
+  };
+
+  const handleExportSuccess = async (paymentIntentId?: string) => {
+    await fetch("/api/stripe/confirm-export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paymentIntentId,
+      }),
+    }); // important for tracking payments, once done we need to let user download for free next time
+
+    //
+
+    console.log(paymentIntentId);
+
+    const timer = setTimeout(async () => {
+      await generateWordpressImport();
+    }, 1500);
+
+    setShowPaymentModal(false);
+    return () => clearTimeout(timer);
   };
 
   const price = calculateExportPrice(selected.size);
@@ -335,61 +356,6 @@ export default function ExportResources() {
         </div>
       )}
 
-      {/* pricing popup */}
-      {/* {showPaymentModal && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => setShowPaymentModal(false)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-semibold text-gray-800 mb-1">
-              Confirm Export
-            </h3>
-            <p className="text-xs text-gray-400 mb-4">
-              You're exporting {selected.size} record
-              {selected.size !== 1 ? "s" : ""}.
-            </p>
-
-            <div className="rounded-md bg-gray-50 border border-gray-100 p-3 mb-4 space-y-1">
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Records</span>
-                <span>{selected.size}</span>
-              </div>
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Price per record</span>
-                <span>$0.15</span>
-              </div>
-              <div className="flex justify-between text-sm font-semibold text-gray-800 pt-1 border-t border-gray-200">
-                <span>Total</span>
-                <span>{price.formatted}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                className="flex-1 rounded-sm text-sm px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-600"
-                onClick={() => setShowPaymentModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="flex-1 rounded-sm text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  handleGenerateWordPressImport();
-                }}
-                disabled={loading}
-              >
-                {loading ? "Processing..." : `Pay ${price.formatted}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
-
       <PaymentModal
         open={showPaymentModal}
         price={{
@@ -397,7 +363,7 @@ export default function ExportResources() {
           total: price.total,
           formatted: price.formatted,
         }}
-        onSuccess={() => handleGenerateWordPressImport()}
+        onSuccess={(paymentId) => handleExportSuccess(paymentId)}
         onClose={() => setShowPaymentModal(false)}
       />
     </div>

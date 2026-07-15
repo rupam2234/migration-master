@@ -8,7 +8,6 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { PRICE_PER_ITEM } from "@/app/api/stripe/default-price";
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
@@ -17,13 +16,21 @@ const stripePromise = loadStripe(
 type PaymentModalProps = {
   open: boolean;
   price: { itemCount: number; total: number; formatted: string };
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId?: string) => void;
   onClose: () => void;
 };
 
+type CheckoutWrapperProps = {
+  price: { itemCount: number; total: number; formatted: string };
+  onSuccess: (paymentIntentId?: string) => void;
+  onCancel: () => void;
+};
+
 type CheckoutFormProps = {
-  price: { formatted: string; itemCount: number };
-  onSuccess: () => void;
+  originalFormatted: string;
+  serverAmount: number | null;
+  couponStatus: "idle" | "valid" | "invalid" | "checking";
+  onSuccess: (paymentIntentId?: string) => void;
   onCancel: () => void;
 };
 
@@ -33,22 +40,6 @@ export function PaymentModal({
   onSuccess,
   onClose,
 }: PaymentModalProps) {
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    fetch("/api/stripe/create-payment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: Math.round(price.total * 100),
-      }),
-    })
-      .then((r) => r.json())
-      .then((d) => setClientSecret(d.clientSecret));
-  }, [open, price.itemCount]);
-
   if (!open) return null;
 
   return (
@@ -68,88 +59,84 @@ export function PaymentModal({
           {price.formatted}
         </p>
 
-        {!clientSecret ? (
-          <div className="py-8 text-center text-xs text-gray-400">
-            Loading payment...
-          </div>
-        ) : (
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
-            <CheckoutForm
-              price={price}
-              onSuccess={() => {
-                onClose();
-                onSuccess();
-              }}
-              onCancel={onClose}
-            />
-          </Elements>
-        )}
+        <CheckoutWrapper
+          price={price}
+          onSuccess={(paymentIntentId) => {
+            // onClose();
+            onSuccess(paymentIntentId);
+          }}
+          onCancel={onClose}
+        />
       </div>
     </div>
   );
 }
 
-function CheckoutForm({ price, onSuccess, onCancel }: CheckoutFormProps) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [paying, setPaying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function CheckoutWrapper({ price, onSuccess, onCancel }: CheckoutWrapperProps) {
   const [coupon, setCoupon] = useState("");
-  const [discount, setDiscount] = useState(0);
   const [couponStatus, setCouponStatus] = useState<
     "idle" | "valid" | "invalid" | "checking"
   >("idle");
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [serverAmount, setServerAmount] = useState<number | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [isFree, setIsFree] = useState(false);
+  const [processing, setProcessing] = useState<boolean>(false);
 
-  const originalAmount = price.itemCount * PRICE_PER_ITEM;
-  const discountAmount = originalAmount * (discount / 100);
-  const finalAmount = originalAmount - discountAmount;
-  const finalFormatted = `$${finalAmount.toFixed(2)}`;
+  const fetchPaymentIntent = async (couponCode?: string) => {
+    setClientSecret(null);
+    try {
+      const res = await fetch("/api/stripe/create-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemCount: price.itemCount,
+          coupon: couponCode,
+          paymentIntentId,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("create-payment failed:", res.status, text);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data.amount === 0) {
+        setIsFree(true);
+        setServerAmount(0);
+        return;
+      }
+
+      setClientSecret(data.clientSecret);
+      setServerAmount(data.amount);
+      if (data.paymentIntentId) setPaymentIntentId(data.paymentIntentId);
+    } catch (e) {
+      console.error("fetchPaymentIntent error:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchPaymentIntent();
+  }, [price.itemCount]);
 
   const applyCoupon = async () => {
     if (!coupon.trim()) return;
+
     setCouponStatus("checking");
 
-    const res = await fetch("/api/stripe/validate-coupon", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: coupon }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok && data.discount) {
-      setDiscount(data.discount);
+    try {
+      await fetchPaymentIntent(coupon);
       setCouponStatus("valid");
-    } else {
-      setDiscount(0);
+    } catch {
       setCouponStatus("invalid");
     }
   };
 
-  const handlePay = async () => {
-    if (!stripe || !elements) return;
-    setPaying(true);
-    setError(null);
-
-    const { error } = await stripe.confirmPayment({
-      elements,
-      redirect: "if_required",
-      confirmParams: {
-        payment_method_data: {
-          billing_details: {
-            phone: "",
-          },
-        },
-      },
-    });
-
-    if (error) {
-      setError(error.message ?? "Payment failed");
-      setPaying(false);
-    } else {
-      onSuccess();
-    }
-  };
+  const discountAmount =
+    serverAmount !== null ? price.total - serverAmount / 100 : 0;
 
   return (
     <div className="space-y-4">
@@ -162,7 +149,7 @@ function CheckoutForm({ price, onSuccess, onCancel }: CheckoutFormProps) {
             onChange={(e) => {
               setCoupon(e.target.value.toUpperCase());
               setCouponStatus("idle");
-              setDiscount(0);
+              setIsFree(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && applyCoupon()}
             placeholder="SAVE20"
@@ -178,32 +165,122 @@ function CheckoutForm({ price, onSuccess, onCancel }: CheckoutFormProps) {
         </div>
 
         {couponStatus === "valid" && (
-          <p className="mt-1 text-xs text-green-600">
-            ✓ {discount}% discount applied
-          </p>
+          <p className="mt-1 text-xs text-green-600">✓ Discount applied</p>
         )}
         {couponStatus === "invalid" && (
           <p className="mt-1 text-xs text-red-500">Invalid or expired coupon</p>
         )}
       </div>
 
-      {discount > 0 && (
+      {couponStatus === "valid" && serverAmount !== null && (
         <div className="rounded-md bg-green-50 border border-green-100 p-3 space-y-1">
           <div className="flex justify-between text-xs text-gray-400">
             <span>Original</span>
             <span className="line-through">{price.formatted}</span>
           </div>
           <div className="flex justify-between text-xs text-green-600">
-            <span>Discount ({discount}%)</span>
+            <span>Discount</span>
             <span>-${discountAmount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm font-semibold text-gray-800 pt-1 border-t border-green-200">
             <span>Total</span>
-            <span>{finalFormatted}</span>
+            <span>${(serverAmount / 100).toFixed(2)}</span>
           </div>
         </div>
       )}
 
+      {isFree ? (
+        <div className="space-y-4">
+          <div className="rounded-md bg-green-50 border border-green-100 p-3 text-center text-sm text-green-700 font-medium">
+            100% discount applied — no payment required
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-sm text-sm px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-600"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+            <button
+              className="flex-1 rounded-sm text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={async () => {
+                setProcessing(true);
+                await new Promise((r) => setTimeout(r, 1000));
+                onSuccess();
+                setProcessing(false);
+              }}
+              disabled={processing}
+            >
+              {processing ? "Processing..." : "Confirm"}
+            </button>
+          </div>
+        </div>
+      ) : !clientSecret ? (
+        <div className="py-8 text-center text-xs text-gray-400">
+          Loading payment...
+        </div>
+      ) : (
+        <Elements
+          key={clientSecret}
+          stripe={stripePromise}
+          options={{ clientSecret }}
+        >
+          <CheckoutForm
+            originalFormatted={price.formatted}
+            serverAmount={serverAmount}
+            couponStatus={couponStatus}
+            onSuccess={onSuccess}
+            onCancel={onCancel}
+          />
+        </Elements>
+      )}
+    </div>
+  );
+}
+
+function CheckoutForm({
+  originalFormatted,
+  serverAmount,
+  couponStatus,
+  onSuccess,
+  onCancel,
+}: CheckoutFormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const displayAmount =
+    couponStatus === "valid" && serverAmount !== null
+      ? `$${(serverAmount / 100).toFixed(2)}`
+      : originalFormatted;
+
+  const handlePay = async () => {
+    if (!stripe || !elements) return;
+    setPaying(true);
+    setError(null);
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+      confirmParams: {
+        payment_method_data: {
+          billing_details: { phone: "" },
+        },
+      },
+    });
+
+    if (error) {
+      setError(error.message ?? "Payment failed");
+      setPaying(false);
+      return;
+    }
+
+    onSuccess(paymentIntent?.id);
+  };
+
+  return (
+    <div className="space-y-4">
       <PaymentElement
         options={{
           wallets: { link: "never", googlePay: "auto" },
@@ -232,9 +309,7 @@ function CheckoutForm({ price, onSuccess, onCancel }: CheckoutFormProps) {
           onClick={handlePay}
           disabled={paying || !stripe}
         >
-          {paying
-            ? "Processing..."
-            : `Pay ${discount > 0 ? finalFormatted : price.formatted}`}
+          {paying ? "Processing..." : `Pay ${displayAmount}`}
         </button>
       </div>
     </div>

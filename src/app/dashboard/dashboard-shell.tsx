@@ -9,6 +9,7 @@ import {
   SidebarOpen,
   Settings,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 
 const ICON_SIZE = 16;
@@ -26,6 +27,7 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const [drawerClosed, setDrawerClosed] = useState<boolean>(false);
   const { setAllProjects, activeProject } = useProjectContext();
+  const route = useRouter();
 
   const navItems: NavItems[] = [
     {
@@ -56,7 +58,7 @@ export function DashboardShell({
       </div>
       <div className="w-full overflow-y-auto">
         <div className="flex h-16 w-full items-center justify-between border-b border-primary/10 px-3">
-          <div className="hidden text-primary/60 md:block">
+          <div className="hidden text-primary/60 md:flex items-center gap-2">
             {drawerClosed ? (
               <SidebarOpen
                 size={28}
@@ -70,6 +72,14 @@ export function DashboardShell({
                 onClick={() => setDrawerClosed((prev) => !prev)}
               />
             )}
+            <button
+              onClick={() => {
+                route.push("/dashboard/new-project");
+              }}
+              className="px-2 py-1 text-xs border hover:bg-primary/10 border-primary/20 rounded-sm"
+            >
+              + Add a new project
+            </button>
           </div>
           <div className="block pl-2 text-primary/60 md:hidden">
             <MenuIcon />

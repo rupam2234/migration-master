@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useProjectContext } from "@/context";
-import { ArrowRight, ShoppingBag } from "lucide-react";
+import { ArrowRight, LightbulbIcon, ShoppingBag } from "lucide-react";
 
 type Message = { text: string; type: "error" | "success" };
 
@@ -64,18 +64,18 @@ export default function AddSite() {
   return (
     <div className="max-w-xl">
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-gray-50">
-          <ShoppingBag className="h-[18px] w-[18px] text-gray-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-primary/80">
+          <ShoppingBag className="h-[18px] w-[18px] text-primary-foreground" />
         </div>
         <div>
-          <p className="text-lg font-medium">Connect a Shopify store</p>
+          <p className="text-sm font-medium">Connect a Shopify store</p>
           <p className="text-sm text-gray-500">
             Add your store domain and admin access token
           </p>
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 p-5">
+      <div className="">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <FormField
             id="shopDomain"
@@ -107,7 +107,7 @@ export default function AddSite() {
             <button
               type="submit"
               disabled={loading}
-              className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-default disabled:opacity-70"
+              className="flex shrink-0 items-center justify-center gap-2 rounded-sm bg-primary/80 px-2 py-1 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-default disabled:opacity-70"
             >
               <span>{loading ? "Connecting" : "Connect store"}</span>
               {!loading && <ArrowRight className="h-4 w-4" />}
@@ -116,9 +116,13 @@ export default function AddSite() {
         </form>
       </div>
 
-      <p className="mt-4 text-xs text-gray-400">
-        Your access token is encrypted before storage and never displayed again.
-      </p>
+      <div className="mt-4 text-xs text-primary/80 flex items-center gap-1">
+        <LightbulbIcon size={18} className="fill-orange-300" />
+        <p>
+          Your access token is encrypted before storage and never displayed
+          again.
+        </p>
+      </div>
     </div>
   );
 }
@@ -140,7 +144,7 @@ function FormField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm text-gray-500">
+      <label htmlFor={id} className="mb-1.5 block text-sm text-primary/80">
         {label}
       </label>
       <input
@@ -150,7 +154,7 @@ function FormField({
         required
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+        className="w-full rounded-sm px-3 py-2 text-sm text-primary-foreground focus-visible:outline-none bg-primary/80 transition focus-visible:ring-0 outline-none"
       />
     </div>
   );

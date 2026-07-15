@@ -397,7 +397,6 @@ export async function GET(
 
     return NextResponse.json(allNodes);
   } catch (error: any) {
-    console.log(error);
     return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
   }
 }
