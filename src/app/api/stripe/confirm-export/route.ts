@@ -1,4 +1,3 @@
-import { getCurrentUser, pool } from "@/lib";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
@@ -38,7 +37,7 @@ export async function POST(req: Request) {
             metadata: paymentIntent.metadata,
         });
 
-        
+
 
     } catch (error: any) {
         return NextResponse.json({ message: error.message ?? "Unexpacted Error" }, { status: 500 })
