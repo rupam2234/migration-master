@@ -1,64 +1,34 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { useProjectContext } from "@/context";
-import { ArrowRight, LightbulbIcon, ShoppingBag } from "lucide-react";
-
-type Message = { text: string; type: "error" | "success" };
+import { useState } from "react";
+import { ArrowRight, ShoppingBag } from "lucide-react";
 
 export default function AddSite() {
-  const router = useRouter();
-  const { setAllProjects, setActiveProject, allProjects } = useProjectContext();
-
   const [shopDomain, setShopDomain] = useState("");
-  const [accessToken, setAccessToken] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<Message | null>(null);
+  const [error, setError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setMessage(null);
+  function connectShopify() {
+    setError("");
 
-    const domain = shopDomain.trim();
-    const token = accessToken.trim();
+    let shop = shopDomain.trim();
 
-    if (!domain || !token) {
-      setMessage({ text: "Both fields are required.", type: "error" });
+    if (!shop) {
+      setError("Please enter your Shopify store domain.");
       return;
     }
 
-    setLoading(true);
+    // Normalize domain
+    shop = shop
+      .replace("https://", "")
+      .replace("http://", "")
+      .replace(/\/$/, "");
 
-    try {
-      const res = await fetch("/api/db/shop/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shopDomain: domain, accessToken: token }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage({
-          text: data.message || "Something went wrong.",
-          type: "error",
-        });
-        setLoading(false);
-        return;
-      }
-
-      setAllProjects([...(allProjects ?? []), domain]);
-      setActiveProject(domain);
-      setMessage({ text: "Store connected. Redirecting...", type: "success" });
-      setTimeout(
-        () => router.push(`/dashboard/${encodeURIComponent(domain)}`),
-        600,
-      );
-    } catch {
-      setMessage({ text: "Network error. Please try again.", type: "error" });
-      setLoading(false);
+    if (!shop.endsWith(".myshopify.com")) {
+      setError("Please enter a valid Shopify domain.");
+      return;
     }
+
+    window.location.href = `/api/shopify/connect?shop=${encodeURIComponent(shop)}`;
   }
 
   return (
@@ -67,95 +37,54 @@ export default function AddSite() {
         <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-primary/80">
           <ShoppingBag className="h-[18px] w-[18px] text-primary-foreground" />
         </div>
+
         <div>
           <p className="text-sm font-medium">Connect a Shopify store</p>
           <p className="text-sm text-gray-500">
-            Add your store domain and admin access token
+            Enter your Shopify store domain to connect securely
           </p>
         </div>
       </div>
+      <div className="flex flex-col gap-2">
+        <div>
+          <label
+            htmlFor="shopDomain"
+            className="mb-1.5 block text-sm text-primary/80"
+          >
+            Shopify store domain
+          </label>
 
-      <div className="">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <FormField
+          <input
             id="shopDomain"
-            label="Store domain"
             type="text"
             placeholder="your-store.myshopify.com"
             value={shopDomain}
-            onChange={setShopDomain}
+            onChange={(e) => setShopDomain(e.target.value)}
+            className="w-full rounded-sm px-3 py-2 text-sm text-primary-foreground bg-primary/80 outline-none"
           />
+        </div>
 
-          <FormField
-            id="accessToken"
-            label="Admin API access token"
-            type="password"
-            placeholder="atkn_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            value={accessToken}
-            onChange={setAccessToken}
-          />
+        {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <div className="flex items-center justify-between gap-4 pt-1">
-            <p
-              className={`text-sm ${
-                message?.type === "error" ? "text-red-500" : "text-emerald-500"
-              }`}
-            >
-              {message?.text || ""}
-            </p>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex shrink-0 items-center justify-center gap-2 rounded-sm bg-primary/80 px-2 py-1 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-default disabled:opacity-70"
-            >
-              <span>{loading ? "Connecting" : "Connect store"}</span>
-              {!loading && <ArrowRight className="h-4 w-4" />}
-            </button>
-          </div>
-        </form>
+        <button
+          type="button"
+          onClick={connectShopify}
+          className="flex items-center justify-center gap-2 rounded-sm bg-primary/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+        >
+          <span>Connect Shopify</span>
+          <ArrowRight className="h-4 w-4" />
+        </button>
       </div>
-
-      <div className="mt-4 text-xs text-primary/80 flex items-center gap-1">
-        <LightbulbIcon size={18} className="fill-orange-300" />
+      <div className="space-y-3 mt-4 text-[13px] text-primary">
         <p>
-          Your access token is encrypted before storage and never displayed
-          again.
+          <strong>Note</strong>: Shopify manages authentication securely.
+          Although this process{" "}
+          <strong>require installation of a plugin (which is automatic)</strong>{" "}
+          as the connection establishes and essential in securely handle your
+          shop authentication.
         </p>
+        <p>Once the migration is complete, you can remove the app instantly.</p>
       </div>
-    </div>
-  );
-}
-
-function FormField({
-  id,
-  label,
-  type,
-  placeholder,
-  value,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  type: string;
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm text-primary/80">
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        placeholder={placeholder}
-        required
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-sm px-3 py-2 text-sm text-primary-foreground focus-visible:outline-none bg-primary/80 transition focus-visible:ring-0 outline-none"
-      />
     </div>
   );
 }
