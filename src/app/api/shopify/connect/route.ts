@@ -1,5 +1,6 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib";
+import { getCurrentUser, pool } from "@/lib";
 
 export async function GET(req: NextRequest) {
     const user = await getCurrentUser();
@@ -7,7 +8,7 @@ export async function GET(req: NextRequest) {
     if (!user) {
         return NextResponse.json(
             { message: "Unauthorized" },
-            { status: 401 }
+            { status: 401 },
         );
     }
 
@@ -16,47 +17,66 @@ export async function GET(req: NextRequest) {
     if (!shop) {
         return NextResponse.json(
             { message: "Shop domain is required" },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
     const normalizedShop = shop
-        .replace("https://", "")
-        .replace("http://", "")
+        .replace(/^https?:\/\//, "")
         .replace(/\/$/, "")
-        .trim();
-
+        .trim()
+        .toLowerCase();
 
     if (!normalizedShop.endsWith(".myshopify.com")) {
         return NextResponse.json(
             { message: "Invalid Shopify domain" },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
+    const connectionId = randomUUID();
 
-    const state = Buffer.from(
-        JSON.stringify({
-            userId: user.id,
-        })
-    ).toString("base64url");
-
-
-    const connectorUrl =
-        new URL(
-            "https://shopify.migrationmaster.online/auth/start"
-        );
-
-    connectorUrl.searchParams.set(
-        "shop",
-        normalizedShop
+    await pool.query(
+        `
+    INSERT INTO shopify_connections
+    (
+      id,
+      user_id,
+      shop_domain,
+      connection_id,
+      status,
+      created_at,
+      updated_at
+    )
+    VALUES
+    (
+      gen_random_uuid(),
+      $1,
+      $2,
+      $3,
+      'PENDING',
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (shop_domain)
+    DO UPDATE SET
+      connection_id = EXCLUDED.connection_id,
+      status = 'PENDING',
+      updated_at = NOW()
+    `,
+        [
+            user.id,
+            normalizedShop,
+            connectionId,
+        ],
     );
 
-    connectorUrl.searchParams.set(
-        "state",
-        state
+    const connectorUrl = new URL(
+        "https://shopify.migrationmaster.online/auth/start",
     );
 
+    connectorUrl.searchParams.set("shop", normalizedShop);
+    connectorUrl.searchParams.set("connectionId", connectionId);
 
     return NextResponse.redirect(connectorUrl);
 }
