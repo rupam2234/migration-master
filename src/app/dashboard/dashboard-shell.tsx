@@ -31,15 +31,23 @@ export function DashboardShell({
   const navItems: NavItems[] = [
     {
       icon: <ArrowRightLeft size={ICON_SIZE} />,
-      link: activeProject ? `/dashboard/${activeProject}` : "#",
+      link: activeProject ? `/dashboard/${activeProject}` : "/dashboard",
       title: "Shopify To WordPress",
-      active: true,
     },
-    // {
-    //   icon: <Settings size={ICON_SIZE} />,
-    //   link: activeProject ? `/dashboard/${activeProject}/import-settings` : "#",
-    //   title: "WP Import Settings",
-    // },
+    {
+      icon: <ArrowRightLeft size={ICON_SIZE} />,
+      link: activeProject
+        ? `/dashboard/${activeProject}/wp-to-shopify`
+        : "/dashboard/wp-to-shopify",
+      title: "WordPress To Shopify",
+    },
+    {
+      icon: <ArrowRightLeft size={ICON_SIZE} />,
+      link: activeProject
+        ? `/dashboard/${activeProject}/wp-to-wp`
+        : "/dashboard/wp-to-wp",
+      title: "WordPress To WordPress",
+    },
   ];
 
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import { ResourceKey } from "@/app";
 import { WXRConfig } from "@/lib";
-import { createContext, ReactNode, useContext, useState } from "react";
+import { createContext, ReactNode, useContext, useState, useEffect } from "react";
 
 interface ProjectContextValue {
   activeProject: string | null;
@@ -30,6 +30,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     defaultAuthor: "admin",
     wxrVersion: "1.2",
   });
+
+  useEffect(() => {
+    setShopifyData({});
+  }, [activeProject]);
 
   return (
     <ProjectContext.Provider
