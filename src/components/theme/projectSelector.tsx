@@ -17,6 +17,14 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
   const param = useParams();
   const pathname = usePathname();
 
+  const disabled = pathname.includes("/export/");
+
+  useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+    }
+  }, [disabled]);
+
   const selectedItem =
     allProjects && allProjects.find((project) => project === activeProject);
 
@@ -27,7 +35,7 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
       allProjects && allProjects.find((x) => x === param.projects);
 
     siteToSelect && setActiveProject(siteToSelect);
-  }, [allProjects, param]);
+  }, [allProjects, param, activeProject, setActiveProject]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -35,36 +43,48 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
         setOpen(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className={`relative ${isCollapsed ? "w-full" : "w-54"}`}
+      className={`relative ${isCollapsed ? "w-full" : "w-[216px]"}`}
     >
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        title={selectedItem ?? "Select a project"}
-        className={`flex min-h-7 w-full items-center rounded-sm border-2 border-primary/20 bg-transparent px-2 py-1 text-xs font-semibold text-primary/80 outline-none ${
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) {
+            setOpen((prev) => !prev);
+          }
+        }}
+        title={
+          disabled
+            ? "Project selection is disabled while exporting."
+            : (selectedItem ?? "Select a project")
+        }
+        className={`flex min-h-7 w-full items-center rounded-sm border-2 border-primary/20 bg-transparent px-2 py-1 text-xs font-semibold outline-none transition-opacity ${
           isCollapsed ? "justify-center" : "justify-between gap-2"
+        } ${
+          disabled
+            ? "cursor-not-allowed opacity-50"
+            : "text-primary/80 hover:border-primary/40"
         }`}
       >
         <ProjectLabel project={selectedItem} isCollapsed={isCollapsed} />
+
         <ChevronsUpDownIcon
           size={16}
-          className="shrink-0 text-primary hidden md:block"
+          className="hidden shrink-0 text-primary md:block"
         />
       </button>
 
       {open && (
-        <div
-          className="absolute left-0 top-full z-10 mt-1 w-full min-w-[160px] 
-          rounded-sm border border-primary/10 bg-primary/80 
-          py-0.5"
-        >
+        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[160px] rounded-sm border border-primary/10 bg-primary/80 py-0.5">
           {allProjects?.map((project) => (
             <button
               key={project}
@@ -83,7 +103,9 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
   function selectProject(title: string) {
     setActiveProject(title);
     setOpen(false);
+
     const currentProject = param.projects as string;
+
     const newPath = currentProject
       ? pathname.replace(
           `/dashboard/${encodeURIComponent(currentProject)}`,
@@ -104,14 +126,14 @@ function ProjectLabel({
 }) {
   if (!project) {
     return isCollapsed ? (
-      <span className="inline-block h-4 w-4" /> // same size as an icon would be
+      <span className="inline-block h-4 w-4" />
     ) : (
-      <span className="text-primary/50">Select a project</span>
+      <span className="truncate text-primary/50">Select a project</span>
     );
   }
 
   return (
-    <span className="flex items-center gap-2 overflow-hidden">
+    <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       {!isCollapsed && <span className="truncate">{project}</span>}
     </span>
   );

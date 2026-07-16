@@ -1,4 +1,4 @@
-import { decryptToken, getCurrentUser, pool } from "@/lib";
+import { getCurrentUser, pool, refreshShopifyAccessToken } from "@/lib";
 import { unstable_cache } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -183,44 +183,71 @@ type Props = {
   variables: Record<string, unknown>
 }
 
-async function shopifyGraphQL(
-  { accessToken, query, shopDomain, variables }: Props
-) {
-  const cachedData = unstable_cache(async (shopDomain: string,
-    accessToken: string,
-    query: string,
-    variables: Record<string, unknown>) => {
-
-    const res = await fetch(
-      `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Shopify-Access-Token": accessToken,
+async function shopifyGraphQL({
+  accessToken,
+  query,
+  shopDomain,
+  variables,
+}: Props) {
+  const cachedData = unstable_cache(
+    async (
+      shopDomain: string,
+      accessToken: string,
+      query: string,
+      variables: Record<string, unknown>,
+    ) => {
+      const res = await fetch(
+        `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": accessToken,
+          },
+          body: JSON.stringify({
+            query,
+            variables,
+          }),
+          cache: "no-store",
         },
-        body: JSON.stringify({ query, variables }),
+      );
+
+      if (!res.ok) {
+        const errorBody = await res.text();
+
+        throw new Error(
+          errorBody ||
+          `Shopify request failed with status ${res.status}`,
+        );
       }
-    );
 
-    if (!res.ok) {
-      const errorBody = await res.text();
-      console.log("Shopify error status:", res.status);
-      console.log("Shopify error body:", errorBody);
-      throw new Error(`Shopify request failed with status ${res.status}`);
-    }
+      const json = await res.json();
 
-    const json = await res.json();
+      if (json.errors) {
+        console.error(json.errors);
+        throw new Error("Shopify query error");
+      }
 
-    if (json.errors) {
-      console.error(json.errors);
-      throw new Error("Shopify query error");
-    }
+      return json;
+    },
+    [
+      "store-data",
+      shopDomain,
+      query,
+      JSON.stringify(variables ?? {}),
+    ],
+    {
+      revalidate: REVALIDATE_IN,
+      tags: [`store_data_${shopDomain}`],
+    },
+  );
 
-    return json;
-  }, ["store-data"], { revalidate: REVALIDATE_IN, tags: ["store_data"] })
-
-  return cachedData(shopDomain, accessToken, query, variables)
+  return cachedData(
+    shopDomain,
+    accessToken,
+    query,
+    variables ?? {},
+  );
 }
 
 /**
@@ -366,21 +393,76 @@ export async function GET(
     const user = await getCurrentUser();
 
     if (!user) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const result = await pool.query(
-      `SELECT encrypted_token FROM shop_credentials WHERE user_id = $1 AND shop_domain = $2`,
-      [user.id, shopDomain]
+      `
+        SELECT 
+          s."accessToken",
+          s."refreshToken",
+          s."expires",
+          s."refreshTokenExpires",
+          sc.status
+        FROM shopify."Session" s
+        JOIN shopify_connections sc
+          ON sc.shop_domain = s.shop
+        WHERE s.shop = $1
+      `,
+      [shopDomain]
     );
+
 
     const credential = result[0];
 
     if (!credential) {
-      return NextResponse.json({ message: "Shop not found" }, { status: 404 });
+      return NextResponse.json(
+        { message: "Shop not found" },
+        { status: 404 }
+      );
     }
 
-    const accessToken = decryptToken(credential.encrypted_token);
+    if (credential.status !== "CONNECTED") {
+      return NextResponse.json(
+        { message: "Shopify connection is not active" },
+        { status: 400 }
+      );
+    }
+
+    let accessToken = credential.accessToken;
+
+    const expiresAt = new Date(credential.expires).getTime();
+
+    if (Date.now() >= expiresAt) {
+      const refreshed = await refreshShopifyAccessToken(
+        shopDomain,
+        credential.refreshToken,
+      );
+
+      accessToken = refreshed.access_token;
+
+      await pool.query(
+        `
+          UPDATE shopify."Session"
+          SET
+            "accessToken" = $1,
+            "refreshToken" = $2,
+            "expires" = NOW() + ($3 * interval '1 second'),
+            "refreshTokenExpires" = NOW() + ($4 * interval '1 second')
+          WHERE shop = $5
+          `,
+        [
+          refreshed.access_token,
+          refreshed.refresh_token,
+          refreshed.expires_in,
+          refreshed.refresh_token_expires_in,
+          shopDomain,
+        ],
+      );
+    }
 
     const normalizedBlogId = blogId
       ? blogId.startsWith("gid://shopify/Article/")

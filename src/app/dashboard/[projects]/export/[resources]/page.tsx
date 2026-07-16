@@ -1,23 +1,36 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, InfoIcon } from "lucide-react";
 import { calculateExportPrice, ResourceKey } from "@/app";
 import { useProjectContext } from "@/context";
 import { useParams } from "next/navigation";
 import { WPimportProps } from "@/app/api/wordpress/[resources]/import/route";
 import JSZip from "jszip";
 import { PaymentModal } from "@/components/theme/paymentModal";
+import { ToolTip } from "@/components";
+import { createExportFingerprint } from "@/lib/exportFingerprint";
+
+type PaymentData = {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+  fingerprint?: string;
+  shopDomain?: string;
+  resource?: string;
+  itemCount?: number;
+  free?: boolean;
+};
 
 const PAGE_SIZE = 11;
 const CELL_TRUNCATE_LENGTH = 60;
 
 export default function ExportResources() {
   const params = useParams();
-  const { shopifyData, wpImportSettings } = useProjectContext();
+  const { shopifyData, wpImportSettings, activeProject } = useProjectContext();
   const key = (params.resources as string).toUpperCase() as ResourceKey;
   const selectedData = shopifyData[key];
-
+  const [exportFingerprint, setExportFingerprint] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [page, setPage] = useState(0);
@@ -26,7 +39,7 @@ export default function ExportResources() {
   const records = useMemo(() => {
     if (!selectedData) return [];
     return Array.isArray(selectedData) ? selectedData : [selectedData];
-  }, [selectedData]);
+  }, [selectedData, activeProject]);
 
   const columns = useMemo(() => {
     const keys = new Set<string>();
@@ -149,28 +162,35 @@ export default function ExportResources() {
     }
   };
 
-  const handleExportSuccess = async (paymentIntentId?: string) => {
-    await fetch("/api/stripe/confirm-export", {
+  const handleExportSuccess = async (paymentData?: PaymentData) => {
+    const res = await fetch("/api/payment/verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        paymentIntentId,
-      }),
-    }); // important for tracking payments, once done we need to let user download for free next time
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(paymentData),
+    });
 
-    //
-
-    console.log(paymentIntentId);
+    if (!res.ok) {
+      console.error("Payment verification failed");
+      return;
+    }
 
     const timer = setTimeout(async () => {
       await generateWordpressImport();
     }, 1500);
 
     setShowPaymentModal(false);
+
     return () => clearTimeout(timer);
   };
 
   const price = calculateExportPrice(selected.size);
+
+  if (!activeProject)
+    return (
+      <div className="p-8 text-center text-gray-500">No project selected!</div>
+    );
 
   if (!selectedData) {
     return (
@@ -179,6 +199,15 @@ export default function ExportResources() {
       </div>
     );
   }
+
+  const getSelectedFingerprint = async () => {
+    const ids = records
+      .filter((_, i) => selected.has(i))
+      .map((item: any) => item.id)
+      .filter(Boolean);
+
+    return createExportFingerprint(ids);
+  };
 
   const gridTemplate = `40px repeat(${columns.length}, minmax(120px, 1fr))`;
 
@@ -194,10 +223,77 @@ export default function ExportResources() {
           )}
         </h2>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <ToolTip
+            content={
+              <div className="space-y-2 text-xs">
+                <p className="font-semibold text-orange-400">
+                  Migration pricing details
+                </p>
+
+                <div className="space-y-1 ">
+                  <p>
+                    <span className="font-medium">Up to 20,000 items</span>
+                    {" — "}
+                    <span className="font-semibold">$0.20/item</span>
+                  </p>
+
+                  {/* <p className="underline">
+                    Minimum migration fee:{" "}
+                    <span className="font-semibold text-white">$5</span>
+                  </p> */}
+
+                  <p>Covers shopify store&apos;s:</p>
+
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    <li>Blog</li>
+                    <li>Pages</li>
+                    <li>Media library</li>
+                    <li>Products</li>
+                    <li>Orders</li>
+                  </ul>
+
+                  <p className="pt-1">Export files are:</p>
+
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    <li>Standard WXR for easy WordPress import</li>
+                    <li>No extra WordPress plugin needed</li>
+                    <li>Chunked by import limit to avoid data loss</li>
+                  </ul>
+                </div>
+              </div>
+            }
+            trigger={<InfoIcon size={18} className="text-primary/60" />}
+            side="bottom"
+          />
           <button
             className="rounded-sm text-sm px-2 py-1 hover:bg-blue-600/70 bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => setShowPaymentModal(true)}
+            onClick={async () => {
+              if (!activeProject) return;
+              const fingerprint = await getSelectedFingerprint();
+
+              const res = await fetch("/api/payment/check-export", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  fingerprint,
+                  shopDomain: activeProject,
+                  resource: key,
+                }),
+              });
+
+              const data = await res.json();
+
+              if (data.paid) {
+                await generateWordpressImport();
+                return;
+              }
+
+              setExportFingerprint(fingerprint);
+              setShowPaymentModal(true);
+            }}
             disabled={selected.size === 0}
           >
             Export {selected.size} Record{selected.size !== 1 ? "s" : ""}
@@ -238,7 +334,6 @@ export default function ExportResources() {
               ))}
             </div>
 
-            {/* Visible rows */}
             {visible.map((row, i) => {
               const globalIndex = safePage * PAGE_SIZE + i;
               const isSelected = selected.has(globalIndex);
@@ -289,7 +384,6 @@ export default function ExportResources() {
         </div>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex mt-7 items-center justify-end gap-1">
           <button
@@ -357,13 +451,16 @@ export default function ExportResources() {
       )}
 
       <PaymentModal
+        fingerprint={exportFingerprint}
         open={showPaymentModal}
+        shopDomain={activeProject}
+        resource={key}
         price={{
           itemCount: selected.size,
           total: price.total,
           formatted: price.formatted,
         }}
-        onSuccess={(paymentId) => handleExportSuccess(paymentId)}
+        onSuccess={handleExportSuccess}
         onClose={() => setShowPaymentModal(false)}
       />
     </div>

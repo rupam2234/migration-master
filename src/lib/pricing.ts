@@ -1,4 +1,5 @@
-import { PRICE_PER_ITEM } from "@/app/api/stripe/default-price";
+
+export const PRICE_PER_ITEM = 0.20
 
 export function calculateExportPrice(count: number) {
     const total = Math.max(0.50, count * PRICE_PER_ITEM);

@@ -1,42 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
+import { useEffect, useState } from "react";
 
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
-);
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 type PaymentModalProps = {
+  fingerprint: string;
   open: boolean;
-  price: { itemCount: number; total: number; formatted: string };
-  onSuccess: (paymentIntentId?: string) => void;
+  shopDomain: string;
+  resource: string;
+  price: {
+    itemCount: number;
+    total: number;
+    formatted: string;
+  };
+  onSuccess: (paymentData?: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+    fingerprint?: string;
+    shopDomain?: string;
+    resource?: string;
+    itemCount?: number;
+    free?: boolean;
+  }) => void;
   onClose: () => void;
-};
-
-type CheckoutWrapperProps = {
-  price: { itemCount: number; total: number; formatted: string };
-  onSuccess: (paymentIntentId?: string) => void;
-  onCancel: () => void;
-};
-
-type CheckoutFormProps = {
-  originalFormatted: string;
-  serverAmount: number | null;
-  couponStatus: "idle" | "valid" | "invalid" | "checking";
-  onSuccess: (paymentIntentId?: string) => void;
-  onCancel: () => void;
 };
 
 export function PaymentModal({
   open,
   price,
+  fingerprint,
+  shopDomain,
+  resource,
   onSuccess,
   onClose,
 }: PaymentModalProps) {
@@ -48,268 +48,270 @@ export function PaymentModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4"
+        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-sm font-semibold text-gray-800 mb-1">
           Confirm Export
         </h3>
+
         <p className="text-xs text-gray-400 mb-4">
-          {price.itemCount} record{price.itemCount !== 1 ? "s" : ""} ·{" "}
-          {price.formatted}
+          {price.itemCount} record
+          {price.itemCount !== 1 ? "s" : ""} · {price.formatted}
         </p>
 
         <CheckoutWrapper
           price={price}
-          onSuccess={(paymentIntentId) => {
-            // onClose();
-            onSuccess(paymentIntentId);
-          }}
+          onSuccess={onSuccess}
           onCancel={onClose}
+          fingerprint={fingerprint}
+          shopDomain={shopDomain}
+          resource={resource}
         />
       </div>
     </div>
   );
 }
 
-function CheckoutWrapper({ price, onSuccess, onCancel }: CheckoutWrapperProps) {
-  const [coupon, setCoupon] = useState("");
-  const [couponStatus, setCouponStatus] = useState<
-    "idle" | "valid" | "invalid" | "checking"
-  >("idle");
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [serverAmount, setServerAmount] = useState<number | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const [isFree, setIsFree] = useState(false);
-  const [processing, setProcessing] = useState<boolean>(false);
-
-  const fetchPaymentIntent = async (couponCode?: string) => {
-    setClientSecret(null);
-    try {
-      const res = await fetch("/api/stripe/create-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemCount: price.itemCount,
-          coupon: couponCode,
-          paymentIntentId,
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("create-payment failed:", res.status, text);
-        return;
-      }
-
-      const data = await res.json();
-
-      if (data.amount === 0) {
-        setIsFree(true);
-        setServerAmount(0);
-        return;
-      }
-
-      setClientSecret(data.clientSecret);
-      setServerAmount(data.amount);
-      if (data.paymentIntentId) setPaymentIntentId(data.paymentIntentId);
-    } catch (e) {
-      console.error("fetchPaymentIntent error:", e);
-    }
+function CheckoutWrapper({
+  price,
+  onSuccess,
+  onCancel,
+  fingerprint,
+  resource,
+  shopDomain,
+}: {
+  price: {
+    itemCount: number;
+    total: number;
+    formatted: string;
   };
+  onSuccess: PaymentModalProps["onSuccess"];
+  onCancel: () => void;
+  fingerprint: string;
+  shopDomain: string;
+  resource: string;
+}) {
+  const [coupon, setCoupon] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [finalAmount, setFinalAmount] = useState(price.total);
+  const [discount, setDiscount] = useState(0);
+  const [couponStatus, setCouponStatus] = useState<
+    "idle" | "checking" | "valid" | "invalid"
+  >("idle");
 
   useEffect(() => {
-    fetchPaymentIntent();
-  }, [price.itemCount]);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
 
-  const applyCoupon = async () => {
+    script.onload = () => {
+      console.log("Razorpay loaded");
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  const verifyCoupon = async () => {
     if (!coupon.trim()) return;
 
     setCouponStatus("checking");
 
     try {
-      await fetchPaymentIntent(coupon);
-      setCouponStatus("valid");
-    } catch {
+      const res = await fetch("/api/payment/coupons/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          coupon: coupon.trim().toUpperCase(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.valid) {
+        setDiscount(data.discount);
+
+        const newTotal = price.total * (1 - data.discount / 100);
+
+        setFinalAmount(newTotal);
+
+        setCouponStatus("valid");
+      } else {
+        setDiscount(0);
+        setFinalAmount(price.total);
+        setCouponStatus("invalid");
+      }
+    } catch (error) {
+      console.error(error);
       setCouponStatus("invalid");
     }
   };
 
-  const discountAmount =
-    serverAmount !== null ? price.total - serverAmount / 100 : 0;
+  const startPayment = async () => {
+    if (!window.Razorpay) {
+      alert("Payment system loading...");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          itemCount: price.itemCount,
+          coupon: coupon.trim().toUpperCase(),
+          fingerprint,
+          shopDomain,
+          resource,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create order");
+      }
+
+      if (data.free) {
+        onSuccess({
+          razorpay_payment_id: "FREE",
+          razorpay_order_id: "FREE",
+          razorpay_signature: "FREE",
+          fingerprint: data.fingerprint,
+          shopDomain: data.shopDomain,
+          resource: data.resource,
+          itemCount: data.itemCount,
+          free: true,
+        });
+
+        return;
+      }
+
+      setFinalAmount(data.total);
+      setDiscount(data.discount);
+
+      const options = {
+        key: process.env.RAZORPAY_KEY,
+
+        amount: data.amount,
+        currency: data.currency,
+        order_id: data.orderId,
+
+        name: "Migration Master",
+        description: "Shopify to WordPress Export",
+
+        handler: async (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          onSuccess({
+            ...response,
+            fingerprint,
+            shopDomain,
+            resource,
+            itemCount: price.itemCount,
+          });
+
+          setLoading(false);
+        },
+
+        modal: {
+          ondismiss() {
+            setLoading(false);
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+
+      razorpay.open();
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       <div>
         <label className="text-xs text-gray-500 mb-1 block">Coupon code</label>
+
         <div className="flex gap-2">
           <input
-            type="text"
             value={coupon}
             onChange={(e) => {
               setCoupon(e.target.value.toUpperCase());
               setCouponStatus("idle");
-              setIsFree(false);
             }}
-            onKeyDown={(e) => e.key === "Enter" && applyCoupon()}
             placeholder="SAVE20"
-            className="flex-1 rounded-sm border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 rounded-sm border px-3 py-1.5 text-sm"
           />
+
           <button
-            onClick={applyCoupon}
-            disabled={couponStatus === "checking" || !coupon.trim()}
-            className="rounded-sm text-sm px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-600 disabled:opacity-50"
+            onClick={verifyCoupon}
+            disabled={couponStatus === "checking"}
+            className="rounded-sm border px-3 text-sm"
           >
             {couponStatus === "checking" ? "..." : "Apply"}
           </button>
         </div>
 
         {couponStatus === "valid" && (
-          <p className="mt-1 text-xs text-green-600">✓ Discount applied</p>
+          <p className="text-xs text-green-600 mt-1">
+            ✓ {discount}% discount applied
+          </p>
         )}
+
         {couponStatus === "invalid" && (
-          <p className="mt-1 text-xs text-red-500">Invalid or expired coupon</p>
+          <p className="text-xs text-red-500 mt-1">Invalid or expired coupon</p>
         )}
       </div>
 
-      {couponStatus === "valid" && serverAmount !== null && (
-        <div className="rounded-md bg-green-50 border border-green-100 p-3 space-y-1">
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>Original</span>
-            <span className="line-through">{price.formatted}</span>
-          </div>
-          <div className="flex justify-between text-xs text-green-600">
+      <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
+        <div className="flex justify-between">
+          <span>Original</span>
+          <span>{price.formatted}</span>
+        </div>
+
+        {discount > 0 && (
+          <div className="flex justify-between text-green-600">
             <span>Discount</span>
-            <span>-${discountAmount.toFixed(2)}</span>
+            <span>-{discount}%</span>
           </div>
-          <div className="flex justify-between text-sm font-semibold text-gray-800 pt-1 border-t border-green-200">
-            <span>Total</span>
-            <span>${(serverAmount / 100).toFixed(2)}</span>
-          </div>
+        )}
+
+        <div className="flex justify-between font-semibold border-t pt-1">
+          <span>Total</span>
+          <span>${finalAmount.toFixed(2)}</span>
         </div>
-      )}
-
-      {isFree ? (
-        <div className="space-y-4">
-          <div className="rounded-md bg-green-50 border border-green-100 p-3 text-center text-sm text-green-700 font-medium">
-            100% discount applied — no payment required
-          </div>
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-sm text-sm px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-600"
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-            <button
-              className="flex-1 rounded-sm text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={async () => {
-                setProcessing(true);
-                await new Promise((r) => setTimeout(r, 1000));
-                onSuccess();
-                setProcessing(false);
-              }}
-              disabled={processing}
-            >
-              {processing ? "Processing..." : "Confirm"}
-            </button>
-          </div>
-        </div>
-      ) : !clientSecret ? (
-        <div className="py-8 text-center text-xs text-gray-400">
-          Loading payment...
-        </div>
-      ) : (
-        <Elements
-          key={clientSecret}
-          stripe={stripePromise}
-          options={{ clientSecret }}
-        >
-          <CheckoutForm
-            originalFormatted={price.formatted}
-            serverAmount={serverAmount}
-            couponStatus={couponStatus}
-            onSuccess={onSuccess}
-            onCancel={onCancel}
-          />
-        </Elements>
-      )}
-    </div>
-  );
-}
-
-function CheckoutForm({
-  originalFormatted,
-  serverAmount,
-  couponStatus,
-  onSuccess,
-  onCancel,
-}: CheckoutFormProps) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [paying, setPaying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const displayAmount =
-    couponStatus === "valid" && serverAmount !== null
-      ? `$${(serverAmount / 100).toFixed(2)}`
-      : originalFormatted;
-
-  const handlePay = async () => {
-    if (!stripe || !elements) return;
-    setPaying(true);
-    setError(null);
-
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      redirect: "if_required",
-      confirmParams: {
-        payment_method_data: {
-          billing_details: { phone: "" },
-        },
-      },
-    });
-
-    if (error) {
-      setError(error.message ?? "Payment failed");
-      setPaying(false);
-      return;
-    }
-
-    onSuccess(paymentIntent?.id);
-  };
-
-  return (
-    <div className="space-y-4">
-      <PaymentElement
-        options={{
-          wallets: { link: "never", googlePay: "auto" },
-          fields: {
-            billingDetails: {
-              name: "auto",
-              email: "auto",
-              phone: "never",
-            },
-          },
-        }}
-      />
-
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
 
       <div className="flex gap-2">
         <button
-          className="flex-1 rounded-sm text-sm px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-600"
           onClick={onCancel}
-          disabled={paying}
+          disabled={loading}
+          className="flex-1 rounded-sm border px-3 py-1.5 text-sm"
         >
           Cancel
         </button>
+
         <button
-          className="flex-1 rounded-sm text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-          onClick={handlePay}
-          disabled={paying || !stripe}
+          onClick={startPayment}
+          disabled={loading}
+          className="flex-1 rounded-sm bg-blue-600 px-3 py-1.5 text-sm text-white"
         >
-          {paying ? "Processing..." : `Pay ${displayAmount}`}
+          {loading ? "Opening..." : "Pay"}
         </button>
       </div>
     </div>

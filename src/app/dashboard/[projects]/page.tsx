@@ -149,7 +149,8 @@ export default function Dashboard() {
         </h2>
 
         <p className="mt-1 text-sm text-primary/50">
-          Fetch the latest data for each resource below.
+          Fetch data for each resource type and prepare individual WordPress
+          import files.
         </p>
       </div>
 

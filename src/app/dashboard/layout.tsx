@@ -27,7 +27,7 @@ export default async function DashboardLayout({
   const getProjects = unstable_cache(
     async (user_id: string) => {
       const result = await pool.query(
-        `SELECT shop_domain FROM shop_credentials WHERE user_id = $1`,
+        `SELECT shop_domain FROM shopify_connections WHERE user_id = $1`,
         [user_id],
       );
 

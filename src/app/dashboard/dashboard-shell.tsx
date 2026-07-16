@@ -7,7 +7,6 @@ import {
   SidebarClose,
   ArrowRightLeft,
   SidebarOpen,
-  Settings,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
@@ -33,13 +32,14 @@ export function DashboardShell({
     {
       icon: <ArrowRightLeft size={ICON_SIZE} />,
       link: activeProject ? `/dashboard/${activeProject}` : "#",
-      title: "Shopify Export",
+      title: "Shopify To WordPress",
+      active: true,
     },
-    {
-      icon: <Settings size={ICON_SIZE} />,
-      link: activeProject ? `/dashboard/${activeProject}/import-settings` : "#",
-      title: "WP Import Settings",
-    },
+    // {
+    //   icon: <Settings size={ICON_SIZE} />,
+    //   link: activeProject ? `/dashboard/${activeProject}/import-settings` : "#",
+    //   title: "WP Import Settings",
+    // },
   ];
 
   useEffect(() => {
