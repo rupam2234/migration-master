@@ -200,13 +200,21 @@ export default function ExportResources() {
     );
   }
 
+  const [prevFingerprint, setPrevFingerprint] = useState("");
+  const [prevIds, setPrevIds] = useState<Set<string>>(new Set());
   const getSelectedFingerprint = async () => {
     const ids = records
       .filter((_, i) => selected.has(i))
       .map((item: any) => item.id)
       .filter(Boolean);
-
-    return createExportFingerprint(ids);
+    // If we already have a fingerprint and the current ids are a subset of previous ids, reuse it
+    if (prevFingerprint && ids.every((id) => prevIds.has(id))) {
+      return prevFingerprint;
+    }
+    const newFingerprint = await createExportFingerprint(ids);
+    setPrevFingerprint(newFingerprint);
+    setPrevIds(new Set(ids));
+    return newFingerprint;
   };
 
   const gridTemplate = `40px repeat(${columns.length}, minmax(120px, 1fr))`;
@@ -214,13 +222,31 @@ export default function ExportResources() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold capitalize text-primary/80">
+        <h2 className="text-sm flex items-center gap-2 font-semibold capitalize text-primary/80">
           Exported {params.resources as string} From Shopify
           {selected.size > 0 && (
-            <span className="ml-2 text-xs font-normal text-gray-400">
+            <span className="text-xs font-normal text-gray-400">
               ({selected.size} of {records.length} selected)
             </span>
           )}
+          <ToolTip
+            content={
+              <div className="space-y-2 text-xs">
+                <p className="font-semibold text-orange-400">
+                  Selection & Pricing
+                </p>
+                <p className="pt-2">
+                  If you have already paid for a set of items, any new export
+                  that selects a <strong>subset</strong> of those items is
+                  available instantly. No additional payment steps required.
+                  Adding items outside the previously paid set will trigger the
+                  normal payment check for newly added items.
+                </p>
+              </div>
+            }
+            trigger={<InfoIcon size={18} className="text-primary/60" />}
+            side="bottom"
+          />
         </h2>
 
         <div className="flex items-center gap-2">
@@ -237,11 +263,6 @@ export default function ExportResources() {
                     {" — "}
                     <span className="font-semibold">$0.20/item</span>
                   </p>
-
-                  {/* <p className="underline">
-                    Minimum migration fee:{" "}
-                    <span className="font-semibold text-white">$5</span>
-                  </p> */}
 
                   <p>Covers shopify store&apos;s:</p>
 
