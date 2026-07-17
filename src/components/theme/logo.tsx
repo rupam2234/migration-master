@@ -5,7 +5,7 @@ export function Logo() {
   return (
     <Link className={styles["mm-logo"]} href={"/"}>
       <span className={styles["mm-logo-mark"]}>Migration Master</span>
-      <span className={styles["mm-logo-tag"]}>/ shopify → wp</span>
+      {/* <span className={styles["mm-logo-tag"]}>/ shopify → wp</span> */}
     </Link>
   );
 }

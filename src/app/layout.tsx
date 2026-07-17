@@ -26,6 +26,7 @@ export const metadata: Metadata = {
     siteName: "Migration Master",
     images: "/images/Migration-Master_logo.png",
   },
+  icons: ["/images/icon.svg"],
 };
 
 export default function RootLayout({
