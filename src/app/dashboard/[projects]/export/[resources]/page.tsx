@@ -35,11 +35,13 @@ export default function ExportResources() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [page, setPage] = useState(0);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [prevFingerprint, setPrevFingerprint] = useState("");
+  const [prevIds, setPrevIds] = useState<Set<string>>(new Set());
 
   const records = useMemo(() => {
     if (!selectedData) return [];
     return Array.isArray(selectedData) ? selectedData : [selectedData];
-  }, [selectedData, activeProject]);
+  }, [selectedData]);
 
   const columns = useMemo(() => {
     const keys = new Set<string>();
@@ -200,8 +202,6 @@ export default function ExportResources() {
     );
   }
 
-  const [prevFingerprint, setPrevFingerprint] = useState("");
-  const [prevIds, setPrevIds] = useState<Set<string>>(new Set());
   const getSelectedFingerprint = async () => {
     const ids = records
       .filter((_, i) => selected.has(i))

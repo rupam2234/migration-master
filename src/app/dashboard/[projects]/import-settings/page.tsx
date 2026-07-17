@@ -1,6 +1,5 @@
 "use client";
 
-import { WPSettingsProps } from "@/app/api/db/wp-settings/set/route";
 import { useProjectContext } from "@/context";
 import { useEffect, useState } from "react";
 
@@ -23,26 +22,6 @@ export default function ImportSettings() {
   useEffect(() => {
     const fetchWpSettings = async () => {
       if (!activeProject) return;
-
-      const res = await fetch("/api/db/wp-settings/get", {
-        headers: {
-          "Content-Type": "application/json",
-          domain: activeProject,
-        },
-      });
-
-      if (!res.ok) {
-        const errorMessage = await res.json();
-        console.error(errorMessage);
-      }
-
-      const data = await res.json();
-
-      setWpImportntSettings({
-        siteUrl: data.data.siteUrl,
-        defaultAuthor: data.data.defaultAuthor,
-        wxrVersion: data.data.wxrVersion,
-      });
     };
 
     fetchWpSettings();
@@ -72,23 +51,18 @@ export default function ImportSettings() {
         defaultWx: "",
       });
 
-      const data: WPSettingsProps = {
-        shopify_domain: activeProject,
-        wp_settings: wpImportSettings,
-      };
+      // const res = await fetch("/api/db/wp-settings/set", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify(data),
+      // });
 
-      const res = await fetch("/api/db/wp-settings/set", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message ?? "Something went wrong");
-      }
+      // if (!res.ok) {
+      //   const error = await res.json();
+      //   throw new Error(error.message ?? "Something went wrong");
+      // }
     } catch (error: any) {
       console.error(error.message ?? "Something went wrong saving settings");
     } finally {
@@ -161,24 +135,7 @@ export default function ImportSettings() {
             </p>
           )}
         </div>
-        {/* <div>
-          <label className="text-sm font-medium text-primary/80">
-            WXR Version
-          </label>
-          <input
-            placeholder="1.2"
-            value={wpImportSettings ? wpImportSettings.wxrVersion : ""}
-            type="text"
-            className="px-2 py-1 text-sm rounded-sm border border-primary/20 w-full focus:outline-none focus:ring-0 focus-visible:ring-0"
-          />
-          {errors && errors.defaultWx ? (
-            <p className="text-xs text-red-500 mt-2">{errors.defaultWx}</p>
-          ) : (
-            <p className="text-xs text-primary/60 mt-2">
-              WordPress export schema version. Defaults to "1.2" if left blank.
-            </p>
-          )}
-        </div> */}
+
         <button
           type="submit"
           disabled={isSubmitting}
