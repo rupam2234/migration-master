@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 const ResourceTypes = {
   PAGES: "pages",
   BLOGS: "blogs",
+  PRODUCTS: "products",
   ORDERS: "orders",
   ARTICLES: "articles",
   SINGLE_ARTICLE: "single_article",
@@ -76,6 +77,13 @@ const RESOURCE_CONFIG: Record<ResourceKey, Services> = {
     description: "Export metadata of your all images",
     icon: Image,
     accent: "bg-neon-500/10 text-neon-600",
+  },
+  PRODUCTS: {
+    type: "products",
+    label: "Products",
+    description: "Export your product catalog and variants",
+    icon: ShoppingCartIcon,
+    accent: "bg-pink-500/10 text-pink-600",
   },
 };
 

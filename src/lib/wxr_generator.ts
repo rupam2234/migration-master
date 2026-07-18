@@ -1,22 +1,51 @@
-/**
- * wxr-generator.ts
- *
- * Converts Shopify resource payloads (from fetchAllResources) into
- * WordPress eXtended RSS (WXR 1.2) XML strings, one resource type
- * at a time so each can be imported individually in the correct order:
- *
- *   1. images   → Media Library attachments
- *   2. blogs    → Categories
- *   3. articles → Posts  (linked to categories by slug)
- *   4. pages    → Pages
- *
- * Large catalogs can be split into chunked WXR files via
- * generateWXRChunks() so each individual import stays well within
- * typical PHP max_execution_time / memory_limit constraints.
- */
-
 import { Resurces } from "@/app/api/shopify/[resources]/fetch/route";
 
+
+export interface ShopifyProductImage {
+    url: string;
+    altText?: string;
+}
+
+export interface ShopifyProductVariant {
+    id: string;
+    title: string;
+    sku?: string;
+    price: string;
+    compareAtPrice?: string | null;
+    inventoryQuantity?: number;
+    availableForSale?: boolean;
+    selectedOptions?: { name: string; value: string }[];
+    image?: { url: string; altText?: string } | null;
+}
+
+export interface ShopifyProductOption {
+    name: string;
+    values: string[];
+}
+
+export interface ShopifyProduct {
+    id: string;
+    title: string;
+    handle: string;
+    description?: string;
+    descriptionHtml?: string;
+    vendor?: string;
+    productType?: string;
+    tags?: string[];
+    status?: string;
+    createdAt: string;
+    updatedAt?: string;
+    publishedAt?: string;
+    totalInventory?: number;
+    featuredImage?: ShopifyProductImage;
+    images?: ShopifyProductImage[];
+    options?: ShopifyProductOption[];
+    priceRangeV2?: {
+        minVariantPrice: { amount: string; currencyCode: string };
+        maxVariantPrice: { amount: string; currencyCode: string };
+    };
+    variants?: ShopifyProductVariant[];
+}
 
 export interface ShopifyImage {
     id: string;
@@ -184,33 +213,33 @@ export function generateImagesWXR(
             const postDate = toMySQLDate(img.createdAt);
             const pubDate = toRFC2822(img.createdAt);
 
-            return `  <item>
-    <title>${escapeXml(filename)}</title>
-    <link>${escapeXml(cfg.siteUrl)}/?attachment_id=${postId}</link>
-    <pubDate>${pubDate}</pubDate>
-    <dc:creator>${cdata(author)}</dc:creator>
-    <content:encoded>${cdata("")}</content:encoded>
-    <excerpt:encoded>${cdata("")}</excerpt:encoded>
-    <wp:post_id>${postId}</wp:post_id>
-    <wp:post_date>${cdata(postDate)}</wp:post_date>
-    <wp:post_date_gmt>${cdata(postDate)}</wp:post_date_gmt>
-    <wp:comment_status>${cdata("closed")}</wp:comment_status>
-    <wp:ping_status>${cdata("closed")}</wp:ping_status>
-    <wp:post_name>${cdata(slug)}</wp:post_name>
-    <wp:status>${cdata("inherit")}</wp:status>
-    <wp:post_type>${cdata("attachment")}</wp:post_type>
-    <wp:post_parent>0</wp:post_parent>
-    <wp:menu_order>0</wp:menu_order>
-    <wp:attachment_url>${cdata(sourceUrl)}</wp:attachment_url>
-    <wp:postmeta>
-      <wp:meta_key>${cdata("_wp_attachment_image_alt")}</wp:meta_key>
-      <wp:meta_value>${cdata(altText)}</wp:meta_value>
-    </wp:postmeta>
-    <wp:postmeta>
-      <wp:meta_key>${cdata("_shopify_gid")}</wp:meta_key>
-      <wp:meta_value>${cdata(img.id)}</wp:meta_value>
-    </wp:postmeta>
-  </item>`;
+            return `<item>
+                        <title>${escapeXml(filename)}</title>
+                        <link>${escapeXml(cfg.siteUrl)}/?attachment_id=${postId}</link>
+                        <pubDate>${pubDate}</pubDate>
+                        <dc:creator>${cdata(author)}</dc:creator>
+                        <content:encoded>${cdata("")}</content:encoded>
+                        <excerpt:encoded>${cdata("")}</excerpt:encoded>
+                        <wp:post_id>${postId}</wp:post_id>
+                        <wp:post_date>${cdata(postDate)}</wp:post_date>
+                        <wp:post_date_gmt>${cdata(postDate)}</wp:post_date_gmt>
+                        <wp:comment_status>${cdata("closed")}</wp:comment_status>
+                        <wp:ping_status>${cdata("closed")}</wp:ping_status>
+                        <wp:post_name>${cdata(slug)}</wp:post_name>
+                        <wp:status>${cdata("inherit")}</wp:status>
+                        <wp:post_type>${cdata("attachment")}</wp:post_type>
+                        <wp:post_parent>0</wp:post_parent>
+                        <wp:menu_order>0</wp:menu_order>
+                        <wp:attachment_url>${cdata(sourceUrl)}</wp:attachment_url>
+                        <wp:postmeta>
+                        <wp:meta_key>${cdata("_wp_attachment_image_alt")}</wp:meta_key>
+                        <wp:meta_value>${cdata(altText)}</wp:meta_value>
+                        </wp:postmeta>
+                        <wp:postmeta>
+                        <wp:meta_key>${cdata("_shopify_gid")}</wp:meta_key>
+                        <wp:meta_value>${cdata(img.id)}</wp:meta_value>
+                        </wp:postmeta>
+                    </item>`;
         })
         .filter(Boolean)
         .join("\n");
@@ -368,7 +397,58 @@ export function generatePagesWXR(
     return wxrHeader(cfg, "Shopify Pages Export") + items + "\n" + wxrFooter();
 }
 
+/**
+ * Deterministic pseudo-ID for URLs that have no Shopify GID of their
+ * own (e.g. product images). Offset so collisions with real Shopify
+ * numeric IDs (13+ digits) are extremely unlikely, but this is a
+ * best-effort hash, not a guarantee — if you hit a collision across
+ * a very large catalog, salt the input string per-product.
+ */
+function pseudoIdFromString(str: string): number {
+    const hash = Math.abs(
+        str.split("").reduce((acc, c) => (acc << 5) - acc + c.charCodeAt(0), 0)
+    );
+    return 900_000_000_000 + hash;
+}
 
+function slugify(title: string): string {
+    return title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+
+/**
+ * Minimal PHP serialize() for the plain shapes WooCommerce needs
+ * (_product_attributes is stored as a serialized PHP array in
+ * postmeta — WordPress's importer does NOT accept JSON here).
+ * Supports: string, number, and plain objects/arrays of those.
+ */
+function phpSerialize(value: unknown): string {
+    if (typeof value === "string") {
+        return `s:${Buffer.byteLength(value, "utf8")}:"${value}";`;
+    }
+    if (typeof value === "number") {
+        return Number.isInteger(value) ? `i:${value};` : `d:${value};`;
+    }
+    if (typeof value === "boolean") {
+        return `b:${value ? 1 : 0};`;
+    }
+    if (Array.isArray(value)) {
+        const body = value
+            .map((v, i) => phpSerialize(i) + phpSerialize(v))
+            .join("");
+        return `a:${value.length}:{${body}}`;
+    }
+    if (value && typeof value === "object") {
+        const entries = Object.entries(value as Record<string, unknown>);
+        const body = entries
+            .map(([k, v]) => phpSerialize(k) + phpSerialize(v))
+            .join("");
+        return `a:${entries.length}:{${body}}`;
+    }
+    return `N;`; // null / undefined
+}
 
 /**
  * Single entry point — pass the resource name and its data array,
@@ -393,12 +473,13 @@ export function generateWXR(
             return generateArticlesWXR(data as ShopifyArticle[], cfg);
         case "pages":
             return generatePagesWXR(data as ShopifyPage[], cfg);
+        case "products":
+            return generateProductsWXR(data as ShopifyProduct[], cfg);
         default:
             throw new Error(`Unknown WXR resource: ${resource}`);
     }
 }
 
-/** Split an array into fixed-size batches, preserving order. */
 function chunkArray<T>(items: T[], size: number): T[][] {
     if (size <= 0) return [items];
     const chunks: T[][] = [];
@@ -435,7 +516,8 @@ const DEFAULT_CHUNK_SIZE: Record<Resurces, number> = {
     articles: 250,
     pages: 250,
     orders: 200,
-    single_article: 1
+    single_article: 1,
+    products: 50,
 };
 
 /**
@@ -479,4 +561,218 @@ export function generateWXRChunks(
             itemCount: batch.length,
         };
     });
+}
+
+export function generateProductsWXR(
+    products: ShopifyProduct[],
+    cfg: WXRConfig
+): string {
+    const author = cfg.defaultAuthor ?? "admin";
+    const blocks: string[] = [];
+
+    for (const product of products) {
+        const postId = gidToId(product.id);
+        const postDate = toMySQLDate(product.createdAt);
+        const pubDate = toRFC2822(product.publishedAt ?? product.createdAt);
+        const variants = product.variants ?? [];
+        const isVariable =
+            variants.length > 1 ||
+            (variants.length === 1 && variants[0].title !== "Default Title");
+
+        // ---- Images: emit as attachment items parented to this product ----
+        const allImages = [
+            ...(product.featuredImage ? [product.featuredImage] : []),
+            ...(product.images ?? []).filter(
+                (img) => img.url !== product.featuredImage?.url
+            ),
+        ];
+
+        const attachmentIds: number[] = [];
+        const attachmentItems = allImages.map((img) => {
+            const attId = pseudoIdFromString(img.url);
+            attachmentIds.push(attId);
+            const filename = urlToFilename(img.url);
+
+            return `  <item>
+                <title>${escapeXml(filename)}</title>
+                <link>${escapeXml(cfg.siteUrl)}/?attachment_id=${attId}</link>
+                <pubDate>${pubDate}</pubDate>
+                <dc:creator>${cdata(author)}</dc:creator>
+                <content:encoded>${cdata("")}</content:encoded>
+                <excerpt:encoded>${cdata("")}</excerpt:encoded>
+                <wp:post_id>${attId}</wp:post_id>
+                <wp:post_date>${cdata(postDate)}</wp:post_date>
+                <wp:post_date_gmt>${cdata(postDate)}</wp:post_date_gmt>
+                <wp:comment_status>${cdata("closed")}</wp:comment_status>
+                <wp:ping_status>${cdata("closed")}</wp:ping_status>
+                <wp:post_name>${cdata(stripExt(filename))}</wp:post_name>
+                <wp:status>${cdata("inherit")}</wp:status>
+                <wp:post_type>${cdata("attachment")}</wp:post_type>
+                <wp:post_parent>${postId}</wp:post_parent>
+                <wp:menu_order>0</wp:menu_order>
+                <wp:attachment_url>${cdata(img.url)}</wp:attachment_url>
+                <wp:postmeta>
+                <wp:meta_key>${cdata("_wp_attachment_image_alt")}</wp:meta_key>
+                <wp:meta_value>${cdata(img.altText ?? "")}</wp:meta_value>
+                </wp:postmeta>
+            </item>`;
+        });
+
+        // ---- Price / stock ----
+        const minPrice = product.priceRangeV2?.minVariantPrice.amount;
+        const simplePrice = variants[0]?.price ?? minPrice ?? "0.00";
+        const simpleCompareAt = variants[0]?.compareAtPrice ?? null;
+        const onSale =
+            simpleCompareAt && parseFloat(simpleCompareAt) > parseFloat(simplePrice);
+
+        const totalStock =
+            product.totalInventory ??
+            variants.reduce((sum, v) => sum + (v.inventoryQuantity ?? 0), 0);
+        const inStock =
+            variants.some((v) => v.availableForSale) || totalStock > 0;
+
+        // ---- Attributes (needed even for simple products with 1 option) ----
+        const attributesArray: Record<string, unknown> = {};
+        (product.options ?? []).forEach((opt, i) => {
+            attributesArray[slugify(opt.name)] = {
+                name: opt.name,
+                value: opt.values.join(" | "),
+                position: i,
+                is_visible: 1,
+                is_variation: isVariable ? 1 : 0,
+                is_taxonomy: 0,
+            };
+        });
+
+        // ---- Category / tag tags ----
+        const categoryTag = product.productType
+            ? `    <category domain="product_cat" nicename="${escapeXml(
+                slugify(product.productType)
+            )}">${cdata(product.productType)}</category>\n`
+            : "";
+        const tagTags = (product.tags ?? [])
+            .map(
+                (tag) =>
+                    `    <category domain="product_tag" nicename="${escapeXml(
+                        slugify(tag)
+                    )}">${cdata(tag)}</category>`
+            )
+            .join("\n");
+
+        const productMeta: [string, string][] = [
+            ["_sku", variants[0]?.sku ?? ""],
+            ["_regular_price", onSale ? String(simpleCompareAt) : String(simplePrice)],
+            ["_price", String(simplePrice)],
+            ["_manage_stock", "yes"],
+            ["_stock", String(totalStock)],
+            ["_stock_status", inStock ? "instock" : "outofstock"],
+            ["_visibility", "visible"],
+            ["_product_attributes", phpSerialize(attributesArray)],
+            ["_shopify_gid", product.id],
+        ];
+        if (onSale) productMeta.push(["_sale_price", String(simplePrice)]);
+        if (attachmentIds.length > 0) {
+            productMeta.push(["_thumbnail_id", String(attachmentIds[0])]);
+        }
+        if (attachmentIds.length > 1) {
+            productMeta.push(["_product_image_gallery", attachmentIds.slice(1).join(",")]);
+        }
+
+        const productMetaXml = productMeta
+            .map(
+                ([key, value]) => `    <wp:postmeta>
+                <wp:meta_key>${cdata(key)}</wp:meta_key>
+                <wp:meta_value>${cdata(value)}</wp:meta_value>
+                </wp:postmeta>`
+            )
+            .join("\n");
+
+        const productItem = `  <item>
+                <title>${escapeXml(product.title)}</title>
+                <link>${escapeXml(cfg.siteUrl)}/product/${escapeXml(product.handle)}/</link>
+                <pubDate>${pubDate}</pubDate>
+                <dc:creator>${cdata(author)}</dc:creator>
+                <content:encoded>${cdata(product.descriptionHtml ?? product.description ?? "")}</content:encoded>
+                <excerpt:encoded>${cdata("")}</excerpt:encoded>
+            ${categoryTag}${tagTags ? tagTags + "\n" : ""}    <category domain="product_type" nicename="${isVariable ? "variable" : "simple"
+            }">${cdata(isVariable ? "variable" : "simple")}</category>
+                <wp:post_id>${postId}</wp:post_id>
+                <wp:post_date>${cdata(postDate)}</wp:post_date>
+                <wp:post_date_gmt>${cdata(postDate)}</wp:post_date_gmt>
+                <wp:comment_status>${cdata("closed")}</wp:comment_status>
+                <wp:ping_status>${cdata("closed")}</wp:ping_status>
+                <wp:post_name>${cdata(product.handle)}</wp:post_name>
+                <wp:status>${cdata(product.status === "ACTIVE" ? "publish" : "draft")}</wp:status>
+                <wp:post_type>${cdata("product")}</wp:post_type>
+                <wp:post_parent>0</wp:post_parent>
+                <wp:menu_order>0</wp:menu_order>
+                <wp:is_sticky>0</wp:is_sticky>
+            ${productMetaXml}
+            </item>`;
+
+        blocks.push(productItem, ...attachmentItems);
+
+        // ---- Variations (only for variable products) ----
+        if (isVariable) {
+            for (const variant of variants) {
+                const variationId = gidToId(variant.id);
+                const varMeta: [string, string][] = [
+                    ["_sku", variant.sku ?? ""],
+                    ["_regular_price", String(variant.compareAtPrice ?? variant.price)],
+                    ["_price", String(variant.price)],
+                    ["_stock", String(variant.inventoryQuantity ?? 0)],
+                    [
+                        "_stock_status",
+                        variant.availableForSale ? "instock" : "outofstock",
+                    ],
+                    ["_shopify_gid", variant.id],
+                ];
+                if (
+                    variant.compareAtPrice &&
+                    parseFloat(variant.compareAtPrice) > parseFloat(variant.price)
+                ) {
+                    varMeta.push(["_sale_price", String(variant.price)]);
+                }
+                (variant.selectedOptions ?? []).forEach((opt) => {
+                    varMeta.push([`attribute_${slugify(opt.name)}`, opt.value]);
+                });
+
+                const varMetaXml = varMeta
+                    .map(
+                        ([key, value]) => `    <wp:postmeta>
+                    <wp:meta_key>${cdata(key)}</wp:meta_key>
+                    <wp:meta_value>${cdata(value)}</wp:meta_value>
+                    </wp:postmeta>`
+                    )
+                    .join("\n");
+
+                blocks.push(`  <item>
+                    <title>${escapeXml(`${product.title} - ${variant.title}`)}</title>
+                    <link>${escapeXml(cfg.siteUrl)}/?post_type=product_variation&p=${variationId}</link>
+                    <pubDate>${pubDate}</pubDate>
+                    <dc:creator>${cdata(author)}</dc:creator>
+                    <content:encoded>${cdata("")}</content:encoded>
+                    <excerpt:encoded>${cdata("")}</excerpt:encoded>
+                    <wp:post_id>${variationId}</wp:post_id>
+                    <wp:post_date>${cdata(postDate)}</wp:post_date>
+                    <wp:post_date_gmt>${cdata(postDate)}</wp:post_date_gmt>
+                    <wp:comment_status>${cdata("closed")}</wp:comment_status>
+                    <wp:ping_status>${cdata("closed")}</wp:ping_status>
+                    <wp:post_name>${cdata(`${product.handle}-${slugify(variant.title)}`)}</wp:post_name>
+                    <wp:status>${cdata("publish")}</wp:status>
+                    <wp:post_type>${cdata("product_variation")}</wp:post_type>
+                    <wp:post_parent>${postId}</wp:post_parent>
+                    <wp:menu_order>0</wp:menu_order>
+                ${varMetaXml}
+                </item>`);
+            }
+        }
+    }
+
+    return (
+        wxrHeader(cfg, "Shopify Products Export") +
+        blocks.join("\n") +
+        "\n" +
+        wxrFooter()
+    );
 }

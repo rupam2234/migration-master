@@ -13,6 +13,7 @@ export type Resurces =
   | "pages"
   | "orders"
   | "images"
+  | "products"
 
 const QUERY_MAP: Record<Resurces, string> = {
   pages: `
@@ -173,6 +174,70 @@ const QUERY_MAP: Record<Resurces, string> = {
       }
     }
   `,
+  products: `
+      query GetAllProducts($cursor: String) {
+        products(first: ${PAGE_SIZE}, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          edges {
+            node {
+              id
+              title
+              handle
+              description
+              descriptionHtml
+              vendor
+              productType
+              tags
+              status
+              createdAt
+              updatedAt
+              publishedAt
+              onlineStoreUrl
+              totalInventory
+              featuredImage {
+                url
+                altText
+                width
+                height
+              }
+              images(first: 20) {
+                edges {
+                  node {
+                    url
+                    altText
+                    width
+                    height
+                  }
+                }
+              }
+              options {
+                name
+                values
+              }
+              priceRangeV2 {
+                minVariantPrice { amount currencyCode }
+                maxVariantPrice { amount currencyCode }
+              }
+              variants(first: 100) {
+                edges {
+                  node {
+                    id
+                    title
+                    sku
+                    price
+                    compareAtPrice
+                    inventoryQuantity
+                    availableForSale
+                    selectedOptions { name value }
+                    image { url altText }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
 
 };
 
@@ -331,6 +396,26 @@ async function fetchAllResources(
           ...article,
           blogId: blog?.id,
           blogTitle: blog?.title,
+        });
+      }
+    } else if (resources === "products") {
+      json = await shopifyGraphQL({
+        accessToken,
+        query: QUERY_MAP.products,
+        shopDomain,
+        variables: { cursor },
+      });
+
+      edges = json.data.products.edges;
+      pageInfo = json.data.products.pageInfo;
+
+      for (const edge of edges) {
+        const { images, variants, ...product } = edge.node;
+
+        allNodes.push({
+          ...product,
+          images: images?.edges?.map((e: any) => e.node) ?? [],
+          variants: variants?.edges?.map((e: any) => e.node) ?? [],
         });
       }
     } else if (resources === "images") {

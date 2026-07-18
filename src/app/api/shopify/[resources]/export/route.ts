@@ -2,7 +2,7 @@ import { generateWXR, WXRConfig } from "@/lib/wxr_generator";
 import { NextRequest, NextResponse } from "next/server";
 import { Resurces } from "../fetch/route";
 
-const WXR_RESOURCES: Resurces[] = ["images", "blogs", "articles", "pages"];
+const WXR_RESOURCES: Resurces[] = ["images", "blogs", "articles", "pages", "products"];
 
 const FILENAME_MAP: Record<Resurces, string> = {
     images: "shopify-media.xml",
@@ -10,7 +10,8 @@ const FILENAME_MAP: Record<Resurces, string> = {
     articles: "shopify-posts.xml",
     pages: "shopify-pages.xml",
     orders: "shopify-orders.xml",
-    single_article: "shopify-single.xml"
+    single_article: "shopify-single.xml",
+    products: "shopify-products.xml",
 }; // for wordpress
 
 export interface ExportProps {
