@@ -5,11 +5,7 @@ interface AuthLayoutProps {
   children: ReactNode;
 }
 
-export default function AuthLayout({
-  children,
-}: {
-  children: AuthLayoutProps;
-}) {
+export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <>
       <Header nav={false} />

@@ -3,6 +3,11 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ProjectProvider } from "@/context/project-context";
 import styles from "./(home)/style.module.css";
+import {
+  Barlow_Condensed,
+  IBM_Plex_Sans,
+  IBM_Plex_Mono,
+} from "next/font/google";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -13,6 +18,21 @@ const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
   weight: "100 900",
+});
+const plex = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex",
+});
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono",
+});
+const barlow = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -36,7 +56,10 @@ export default function RootLayout({
 }>) {
   return (
     <ProjectProvider>
-      <html lang="en">
+      <html
+        lang="en"
+        className={`${plex.variable} ${mono.variable} ${barlow.variable}`}
+      >
         <body
           className={`${geistSans.variable} ${styles["mm-root"]}  ${geistMono.variable} antialiased`}
         >

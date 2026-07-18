@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DashboardNavigation, NavItems, SelectProject } from "@/components";
+import {
+  DashboardFooter,
+  DashboardNavigation,
+  NavIcons,
+  NavItems,
+  SelectProject,
+} from "@/components";
 import { useProjectContext } from "@/context";
-import { ArrowRightLeft, SidebarOpen, SidebarClose } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
-
-const ICON_SIZE = 16;
+import { usePathname } from "next/navigation";
 
 export interface DashboardShellProps {
   children: ReactNode;
@@ -20,35 +24,36 @@ export function DashboardShell({
   user,
   projects,
 }: DashboardShellProps) {
-  const [drawerClosed, setDrawerClosed] = useState<boolean>(false);
+  const [drawerClosed, setDrawerClosed] = useState<boolean>(true);
   const { setAllProjects, activeProject } = useProjectContext();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const router = useRouter();
   const toggleProfileMenu = () => setShowProfileMenu((prev) => !prev);
-
-  // Close menu when click outside - could be added later
+  const breadcrumbItems = usePathname().split("/").filter(Boolean).slice(0, 3);
 
   const navItems: NavItems[] = [
     {
-      icon: <ArrowRightLeft size={ICON_SIZE} />,
+      icon: <NavIcons size={15} imagePath="/images/shopify-logo.png" />,
       link: activeProject ? `/dashboard/${activeProject}` : "/dashboard",
       title: "Shopify To WordPress",
     },
     {
-      icon: <ArrowRightLeft size={ICON_SIZE} />,
+      icon: <NavIcons size={15} imagePath="/images/wordpress-logo.png" />,
       link: activeProject
         ? `/dashboard/${activeProject}/wp-to-shopify`
         : "/dashboard/wp-to-shopify",
       title: "WordPress To Shopify",
     },
-    {
-      icon: <ArrowRightLeft size={ICON_SIZE} />,
-      link: activeProject
-        ? `/dashboard/${activeProject}/wp-to-wp`
-        : "/dashboard/wp-to-wp",
-      title: "WordPress To WordPress",
-    },
+    // {
+    //   icon: <ArrowRightLeft size={ICON_SIZE} />,
+    //   link: activeProject
+    //     ? `/dashboard/${activeProject}/wp-to-wp`
+    //     : "/dashboard/wp-to-wp",
+    //   title: "WordPress To WordPress",
+    // },
   ];
+
+  const sidebarWidth = drawerClosed ? "w-16" : "w-16 md:w-72";
 
   useEffect(() => {
     if (projects.length === 0) return;
@@ -58,49 +63,62 @@ export function DashboardShell({
   return (
     <div className="flex h-screen">
       <div
-        className={`${drawerClosed ? "md:w-16" : "md:w-72 w-16"} space-y-14 border-r border-primary/10 p-5`}
+        onMouseEnter={() => {
+          if (window.innerWidth >= 768) {
+            setDrawerClosed(false);
+          }
+        }}
+        onMouseLeave={() => {
+          if (window.innerWidth >= 768) {
+            setDrawerClosed(true);
+          }
+        }}
+        className={`${sidebarWidth} space-y-14 flex flex-col justify-between border-r border-primary/10 p-5 transition-all duration-200`}
       >
-        <SelectProject isCollapsed={drawerClosed} />
-        <DashboardNavigation navItems={navItems} collapsed={drawerClosed} />
+        <div className="flex flex-col gap-8">
+          <SelectProject isCollapsed={drawerClosed} />
+          <DashboardNavigation navItems={navItems} collapsed={drawerClosed} />
+        </div>
+        <DashboardFooter collapsed={drawerClosed} />
       </div>
       <div className="w-full overflow-y-auto">
-        <div className="flex h-16 w-full items-center justify-between border-b border-primary/10 px-3">
-          <div className="flex items-center gap-2">
-            {drawerClosed ? (
-              <SidebarOpen
-                size={28}
-                className="cursor-pointe text-primary/60 rounded-full p-1.5 hover:bg-primary/10"
-                onClick={() => setDrawerClosed((prev) => !prev)}
-              />
-            ) : (
-              <SidebarClose
-                size={28}
-                className="cursor-pointer text-primary/60 rounded-full p-1.5 hover:bg-primary/10"
-                onClick={() => setDrawerClosed((prev) => !prev)}
-              />
+        <div className="flex gap-4 h-16 w-full items-center justify-between border-b border-primary/10 px-3">
+          <nav className="text-sm text-primary/60 flex items-center gap-1">
+            <Link href="/dashboard" className="hover:underline hidden md:block">
+              Dashboard
+            </Link>
+
+            {activeProject && (
+              <>
+                <span className="hidden md:block">/</span>
+
+                {/* Mobile */}
+                <Link
+                  href={`/dashboard/${activeProject}`}
+                  className="hover:underline"
+                >
+                  <span className="md:hidden">
+                    {activeProject.split(".myshopify")[0]}
+                  </span>
+
+                  {/* Desktop */}
+                  <span className="hidden md:inline">
+                    {breadcrumbItems.slice(1).map((item, index) => (
+                      <span key={item}>
+                        {index > 0 && " / "}
+                        {item.includes(".myshopify")
+                          ? item
+                          : item.replaceAll("-", " ")}
+                      </span>
+                    ))}
+                  </span>
+                </Link>
+              </>
             )}
-            {/* Breadcrumb */}
-            <nav className="text-sm text-primary/60 hidden md:flex items-center gap-1">
-              <Link href="/dashboard" className="hover:underline">
-                Dashboard
-              </Link>
-              {activeProject && (
-                <>
-                  <span>/</span>
-                  <Link
-                    href={`/dashboard/${activeProject}`}
-                    className="hover:underline"
-                  >
-                    {activeProject}
-                  </Link>
-                </>
-              )}
-            </nav>
-          </div>
+          </nav>
 
           {/* Right side: add button, profile icon, user name */}
           <div className="flex items-center gap-4">
-            {/* Add new project button */}
             <button
               onClick={() => {
                 router.push("/dashboard/new-project");

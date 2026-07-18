@@ -221,17 +221,19 @@ export default function ExportResources() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm flex items-center gap-2 font-semibold capitalize text-primary/80">
-          Exported {params.resources as string} From Shopify
+      <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
+        <h2 className="text-sm flex items-center flex-wrap gap-2 font-semibold capitalize text-primary/80">
+          <span>Exported {params.resources as string} From Shopify</span>
+
           {selected.size > 0 && (
             <span className="text-xs font-normal text-gray-400">
               ({selected.size} of {records.length} selected)
             </span>
           )}
+
           <ToolTip
             content={
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-xs max-w-xs">
                 <p className="font-semibold text-orange-400">
                   Selection & Pricing
                 </p>
@@ -239,25 +241,25 @@ export default function ExportResources() {
                   If you have already paid for a set of items, any new export
                   that selects a <strong>subset</strong> of those items is
                   available instantly. No additional payment steps required.
-                  Adding items outside the previously paid set will trigger the
-                  normal payment check for newly added items.
                 </p>
               </div>
             }
-            trigger={<InfoIcon size={18} className="text-primary/60" />}
+            trigger={
+              <InfoIcon size={18} className="text-primary/60 shrink-0" />
+            }
             side="bottom"
           />
         </h2>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <ToolTip
             content={
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-xs max-w-xs">
                 <p className="font-semibold text-orange-400">
                   Migration pricing details
                 </p>
 
-                <div className="space-y-1 ">
+                <div className="space-y-1">
                   <p>
                     <span className="font-medium">Up to 20,000 items</span>
                     {" — "}
@@ -273,24 +275,20 @@ export default function ExportResources() {
                     <li>Products</li>
                     <li>Orders</li>
                   </ul>
-
-                  <p className="pt-1">Export files are:</p>
-
-                  <ul className="list-disc space-y-0.5 pl-4">
-                    <li>Standard WXR for easy WordPress import</li>
-                    <li>No extra WordPress plugin needed</li>
-                    <li>Chunked by import limit to avoid data loss</li>
-                  </ul>
                 </div>
               </div>
             }
-            trigger={<InfoIcon size={18} className="text-primary/60" />}
+            trigger={
+              <InfoIcon size={18} className="text-primary/60 shrink-0" />
+            }
             side="bottom"
           />
+
           <button
-            className="rounded-sm text-sm px-2 py-1 hover:bg-blue-600/70 bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-sm text-xs md:text-sm px-2 py-1 hover:bg-blue-600/70 bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
             onClick={async () => {
               if (!activeProject) return;
+
               const fingerprint = await getSelectedFingerprint();
 
               const res = await fetch("/api/payment/check-export", {

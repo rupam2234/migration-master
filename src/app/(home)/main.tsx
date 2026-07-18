@@ -12,7 +12,7 @@ import {
   Package,
 } from "lucide-react";
 import styles from "./style.module.css";
-import { Header } from "@/components";
+import { Container, Header } from "@/components";
 
 const TIERS = [
   {
@@ -29,18 +29,6 @@ const TIERS = [
     ],
   },
 ];
-
-function rateForCount() {
-  return TIERS[0];
-}
-
-function formatUSD(n: number) {
-  return n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-}
 
 const MANIFEST_ROWS = [
   { label: "Images", count: "4,231", icon: ImageIcon },
@@ -140,10 +128,10 @@ export default function Main() {
   }, [itemCount, tier]);
 
   return (
-    <div className={styles["mm-root"]}>
+    <div className={`${styles["mm-root"]}`}>
       <Header nav items={NAV_ITEMS} />
 
-      <div>
+      <Container>
         <section className={`${styles["mm-shell"]} ${styles["mm-hero"]}`}>
           <div>
             <p className={styles["mm-eyebrow"]}>
@@ -415,7 +403,7 @@ export default function Main() {
             </div>
           </div>
         </section>
-      </div>
+      </Container>
 
       <footer className={styles["mm-footer"]}>
         <div className={`${styles["mm-shell"]} ${styles["mm-footer-row"]}`}>
@@ -438,4 +426,16 @@ export default function Main() {
       </footer>
     </div>
   );
+}
+
+function rateForCount() {
+  return TIERS[0];
+}
+
+function formatUSD(n: number) {
+  return n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
 }

@@ -29,14 +29,24 @@ export function DashboardNavigation({
             <Link
               href={item.link ?? "#"}
               key={item.title}
-              className={`flex ${isActive ? "bg-primary/10 text-primary" : "text-primary/80"} text-sm hover:bg-primary/10 px-2 rounded-sm font-medium ${collapsed ? "justify-center" : ""} items-center gap-2 py-1 hover:text-primary/60 my-2`}
+              className={`flex ${
+                isActive ? "bg-primary/10 text-primary" : "text-primary/80"
+              } text-sm hover:bg-primary/10 ${collapsed ? "px-1" : "px-2"} rounded-sm font-medium items-center gap-2 py-1 my-2 whitespace-nowrap transition-colors`}
             >
-              <span>{item?.icon ?? <PiIcon size={16} />}</span>
-              {!collapsed && <span>{item.title}</span>}
+              <span className="shrink-0 flex items-center justify-center">
+                {item.icon ?? <PiIcon size={12} />}
+              </span>
+
+              <span
+                className={`overflow-hidden transition-all duration-200 ${
+                  collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                }`}
+              >
+                {item.title}
+              </span>
             </Link>
           );
         })}
     </div>
   );
 }
-

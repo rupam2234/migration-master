@@ -52,7 +52,7 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
   return (
     <div
       ref={containerRef}
-      className={`relative ${isCollapsed ? "w-full" : "w-[216px]"}`}
+      className={`relative ${isCollapsed ? "w-[24px]" : "w-[216px]"}`}
     >
       <button
         type="button"
@@ -79,12 +79,12 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
 
         <ChevronsUpDownIcon
           size={16}
-          className="hidden shrink-0 text-primary md:block"
+          className="shrink-0 text-primary md:block"
         />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-[160px] rounded-sm border border-primary/10 bg-primary/80 py-0.5">
+        <div className="absolute left-0 top-full z-10 mt-1 w-full min-w-max rounded-sm border border-primary/10 bg-primary/80 py-0.5">
           {allProjects?.map((project) => (
             <button
               key={project}
