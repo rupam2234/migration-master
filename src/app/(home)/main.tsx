@@ -12,7 +12,7 @@ import {
   Package,
 } from "lucide-react";
 import styles from "./style.module.css";
-import { Container, Header } from "@/components";
+import { Container, Footer, Header } from "@/components";
 
 const TIERS = [
   {
@@ -405,25 +405,7 @@ export default function Main() {
         </section>
       </Container>
 
-      <footer className={styles["mm-footer"]}>
-        <div className={`${styles["mm-shell"]} ${styles["mm-footer-row"]}`}>
-          <div>
-            <div className={styles["mm-logo"]} style={{ marginBottom: 8 }}>
-              <span className={styles["mm-logo-mark"]}>Migration Master</span>
-            </div>
-            <p className={styles["mm-footer-tag"]}>
-              Shopify to WordPress content migration — blog posts, pages, and
-              media, exported and packaged for import.
-            </p>
-          </div>
-          <nav className={styles["mm-footer-links"]} aria-label="Footer">
-            <a href="#how-it-works">How it works</a>
-            <a href="#what-moves">What moves</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
-          </nav>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
