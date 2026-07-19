@@ -171,11 +171,8 @@ const steps = [
 
 export default function HowToMigrateShopifyProductsToWordPress() {
   return (
-    <article className="max-w-3xl mx-auto px-6 py-16 text-neutral-900">
+    <article className="max-w-3xl mx-auto px-6 pt-7 pb-16 text-neutral-900">
       <header className="mb-12">
-        <p className="text-sm font-medium tracking-wide text-orange-700 uppercase mb-3">
-          Guide
-        </p>
         <h1 className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight">
           {meta.title}
         </h1>
