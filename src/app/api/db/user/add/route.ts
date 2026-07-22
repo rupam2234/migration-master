@@ -62,7 +62,7 @@ export async function POST(request: Request) {
                 exporting your content. If you need help connecting your store, you can
                 check our step-by-step guide here:
                 <a
-                  href="${baseAddress}/blog/how-to-connect-shopify"
+                  href="${baseAddress}/blog/how-to-connect-shopify-to-migration-master"
                   style="color:#CC6CE7; text-decoration:underline;"
                 >
                   Shopify connection guide
