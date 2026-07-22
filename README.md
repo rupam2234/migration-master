@@ -47,4 +47,34 @@ Questions or issues — see the [FAQ](https://migrationmaster.online/#faq) or re
 
 ## License
 
-*(Add your license here, e.g. MIT / proprietary — delete this line and replace with your actual terms.)*
+Copyright (c) 2026 Migration Master. All Rights Reserved.
+
+This software and associated documentation files (the "Software") are the
+proprietary property of Migration Master ("the Owner"). The Software is made
+available for internal use only and is not licensed for use, reproduction,
+modification, distribution, sublicensing, or public disclosure by any other
+party.
+
+No permission is granted to any person to:
+  - Copy, modify, merge, publish, or create derivative works of the Software
+  - Distribute, sublicense, sell, rent, lease, or otherwise transfer copies
+    of the Software
+  - Reverse engineer, decompile, or disassemble the Software, except where
+    such restriction is prohibited by applicable law
+  - Use the Software for any purpose other than as authorized in writing by
+    the Owner
+
+All rights, title, and interest in and to the Software, including all
+associated intellectual property rights, remain exclusively with the Owner.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE
+USE OF THE SOFTWARE.
+
+Unauthorized use, copying, or distribution of this Software, or any portion
+of it, may result in civil and criminal penalties and will be prosecuted to
+the maximum extent possible under law.
+
+For licensing inquiries, contact: rupam.krishna999@gmail.com
