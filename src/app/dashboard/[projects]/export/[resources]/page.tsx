@@ -183,7 +183,6 @@ export default function ExportResources() {
     }, 1500);
 
     setShowPaymentModal(false);
-
     return () => clearTimeout(timer);
   };
 

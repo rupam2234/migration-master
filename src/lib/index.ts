@@ -7,3 +7,4 @@ export type { WXRConfig } from "./wxr_generator"
 export { refreshShopifyAccessToken } from "./shopify-refresh";
 export { getCouponDiscount } from "./getCoupon"
 export { createExportFingerprint } from "./exportFingerprint"
+export { resend } from "./resend"

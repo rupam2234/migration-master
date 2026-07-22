@@ -19,11 +19,12 @@ const TIERS = [
     name: "Migration",
     range: "Up to 20,000 items",
     rate: 0.2,
-    minimum: 5,
+    minimum: 1,
     icon: Package,
-    blurb: "For a single store's blog, pages, and media library.",
+    blurb: "Features:",
     features: [
-      "Standard chunked WXR export",
+      "Quick API authentication with shopify store",
+      "Chunked WXR file for default WP import",
       "Itemized manifest before you pay",
       "Email support",
     ],
@@ -121,7 +122,7 @@ export default function Main() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [itemCount, setItemCount] = useState(0);
 
-  const tier = useMemo(() => rateForCount(), [itemCount]);
+  const tier = useMemo(() => rateForCount(), []);
   const estimate = useMemo(() => {
     const raw = itemCount * tier?.rate;
     return Math.max(raw, tier?.minimum);
@@ -309,7 +310,7 @@ export default function Main() {
                     </div>
                     <div className={styles["mm-tier-min"]}>
                       {t.minimum > 0
-                        ? `${formatUSD(t.minimum)} minimum`
+                        ? `Free WordPress import file generation until ${formatUSD(t.minimum)}`
                         : "No minimum"}
                     </div>
                     <div className={styles["mm-tier-blurb"]}>{t.blurb}</div>

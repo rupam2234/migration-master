@@ -8,6 +8,7 @@ export const meta = {
   title: "How to Migrate Shopify Products to WordPress",
   description:
     "A screenshot-by-screenshot walkthrough of migrating a Shopify product catalog into WordPress and WooCommerce using Migration Master.",
+  author: "Migration Master Editorial Team",
 };
 
 const steps = [
@@ -172,14 +173,19 @@ const steps = [
 export default function HowToMigrateShopifyProductsToWordPress() {
   return (
     <article className="max-w-3xl mx-auto px-6 pt-7 pb-16 text-neutral-900">
-      <header className="mb-12">
+      <header className="mb-5">
         <h1 className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight">
           {meta.title}
         </h1>
-        <p className="text-lg text-neutral-600 mt-4 leading-relaxed">
+        <p className="text-sm text-neutral-600 mt-4 leading-relaxed">
           {meta.description}
         </p>
+        <p className="text-xs italic text-neutral-600 mt-4 leading-relaxed">
+          <strong>By</strong> - <span>{meta.author}</span>
+        </p>
       </header>
+
+      <div className="border border-b border-primary/20 w-full mb-5" />
 
       <div className="space-y-16">
         {steps.map((step) => (

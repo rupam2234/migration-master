@@ -32,6 +32,7 @@ export default function SignIn() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
+        redirect: "follow",
       });
 
       const data = await res.json();
@@ -47,7 +48,9 @@ export default function SignIn() {
 
       setMessage({ text: "Signed in. Redirecting...", type: "success" });
       setLoading(false);
-      router.push("/dashboard");
+
+      router.replace("/dashboard");
+      router.refresh();
     } catch {
       setMessage({ text: "Network error. Please try again.", type: "error" });
       setLoading(false);

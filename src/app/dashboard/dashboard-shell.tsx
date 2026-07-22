@@ -10,7 +10,7 @@ import {
   SelectProject,
 } from "@/components";
 import { useProjectContext } from "@/context";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 export interface DashboardShellProps {
@@ -28,8 +28,9 @@ export function DashboardShell({
   const { setAllProjects, activeProject } = useProjectContext();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const router = useRouter();
-  const toggleProfileMenu = () => setShowProfileMenu((prev) => !prev);
   const breadcrumbItems = usePathname().split("/").filter(Boolean).slice(0, 3);
+
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const navItems: NavItems[] = [
     {
@@ -55,10 +56,64 @@ export function DashboardShell({
 
   const sidebarWidth = drawerClosed ? "w-16" : "w-16 md:w-72";
 
+  const profileNav: { title: string; link?: string; onClick?: () => void }[] = [
+    {
+      title: "Export Jobs",
+      link: activeProject
+        ? `/dashboard/${activeProject}/export-jobs`
+        : "/dashboard/export-jobs",
+    },
+    {
+      title: "Settings",
+      link: activeProject
+        ? `/dashboard/${activeProject}/import-settings`
+        : "/dashboard/import-settings",
+    },
+    {
+      title: "Log out",
+      onClick: async () => {
+        const res = await fetch("/api/db/user/sign-out", {
+          method: "POST",
+        });
+
+        if (!res.ok) {
+          const errorRes: any = await res.json();
+          console.error(errorRes.message);
+        }
+
+        if (res.ok) {
+          router.replace("/auth/sign-in");
+          router.refresh();
+        }
+      },
+    },
+  ];
+
+  const toggleProfileMenu = () => {
+    return setShowProfileMenu((prev) => !prev);
+  };
+
   useEffect(() => {
     if (projects.length === 0) return;
     setAllProjects(projects);
   }, [projects, setAllProjects]);
+
+  useEffect(() => {
+    const handleClickOutsideProfileMenu = (e: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutsideProfileMenu);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideProfileMenu);
+    };
+  }, []);
 
   return (
     <div className="flex h-screen">
@@ -128,7 +183,11 @@ export function DashboardShell({
               + Add a new project
             </button>
             {/* Profile icon with dropdown */}
-            <div className="relative" onClick={toggleProfileMenu}>
+            <div
+              className="relative"
+              onClick={toggleProfileMenu}
+              ref={profileMenuRef}
+            >
               <div className="flex items-center gap-1 cursor-pointer">
                 <div className="h-8 w-8 flex items-center justify-center rounded-full bg-primary/20 text-primary font-medium uppercase">
                   {user.name?.charAt(0)}
@@ -136,26 +195,19 @@ export function DashboardShell({
               </div>
               {showProfileMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg border border-primary/10 rounded-md py-1 z-20">
-                  <Link
-                    href={
-                      activeProject
-                        ? `/dashboard/${activeProject}/export-jobs`
-                        : "/dashboard/export-jobs"
-                    }
-                    className="block px-4 py-2 text-sm text-primary/80 hover:bg-primary/10"
-                  >
-                    Export Jobs
-                  </Link>
-                  <Link
-                    href={
-                      activeProject
-                        ? `/dashboard/${activeProject}/import-settings`
-                        : "/dashboard/import-settings"
-                    }
-                    className="block px-4 py-2 text-sm text-primary/80 hover:bg-primary/10"
-                  >
-                    Settings
-                  </Link>
+                  {profileNav &&
+                    profileNav.map((item) => {
+                      return (
+                        <Link
+                          key={item.title}
+                          href={item.link !== undefined ? item.link : ""}
+                          className="block px-4 py-2 text-sm text-primary/80 hover:bg-primary/10"
+                          onClick={item.onClick}
+                        >
+                          {item.title}
+                        </Link>
+                      );
+                    })}
                 </div>
               )}
             </div>

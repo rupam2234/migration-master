@@ -38,32 +38,32 @@ export async function GET(req: NextRequest) {
 
     await pool.query(
         `
-    INSERT INTO shopify_connections
-    (
-      id,
-      user_id,
-      shop_domain,
-      connection_id,
-      status,
-      created_at,
-      updated_at
-    )
-    VALUES
-    (
-      gen_random_uuid(),
-      $1,
-      $2,
-      $3,
-      'PENDING',
-      NOW(),
-      NOW()
-    )
-    ON CONFLICT (shop_domain)
-    DO UPDATE SET
-      connection_id = EXCLUDED.connection_id,
-      status = 'PENDING',
-      updated_at = NOW()
-    `,
+            INSERT INTO shopify_connections
+            (
+                id,
+                user_id,
+                shop_domain,
+                connection_id,
+                status,
+                created_at,
+                updated_at
+            )
+            VALUES
+            (
+                gen_random_uuid(),
+                $1,
+                $2,
+                $3,
+                'PENDING',
+            NOW(),
+            NOW()
+            )
+            ON CONFLICT (shop_domain)
+            DO UPDATE SET
+            connection_id = EXCLUDED.connection_id,
+            status = 'PENDING',
+            updated_at = NOW()
+        `,
         [
             user.id,
             normalizedShop,
