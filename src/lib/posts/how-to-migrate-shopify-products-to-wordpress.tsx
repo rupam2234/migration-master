@@ -1,4 +1,7 @@
-import Image from "next/image";
+import BlogArticle from "@/components/blog/blogArticle";
+import BlogHeader from "@/components/blog/blogHeader";
+import BlogStep from "@/components/blog/blogStep";
+import Link from "next/link";
 
 const IMG_DIR =
   "/images/blog/posts/how-to-migrate-shopify-products-to-wordpress";
@@ -59,8 +62,15 @@ const steps = [
           >
             migrationmaster.online
           </a>{" "}
-          and add your store as a project. Once selected, you land on the{" "}
-          <strong>Export Shopify Contents</strong> dashboard.
+          and add your store as a project. (You can read more on{" "}
+          <Link
+            href={"/blog/how-to-connect-shopify-to-migration-master"}
+            className="underline underline-offset-2 hover:text-orange-700"
+          >
+            how to connect your shopify store with Migration Master
+          </Link>
+          ). Once the connection process is complete, select the project and you
+          will land on the <strong>Export Shopify Contents</strong> dashboard.
         </p>
         <p className="mt-4">
           For a product migration, click <strong>Fetch</strong> on the{" "}
@@ -172,55 +182,17 @@ const steps = [
 
 export default function HowToMigrateShopifyProductsToWordPress() {
   return (
-    <article className="max-w-3xl mx-auto px-6 pt-7 pb-16 text-neutral-900">
-      <header className="mb-5">
-        <h1 className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight">
-          {meta.title}
-        </h1>
-        <p className="text-sm text-neutral-600 mt-4 leading-relaxed">
-          {meta.description}
-        </p>
-        <p className="text-xs italic text-neutral-600 mt-4 leading-relaxed">
-          <strong>By</strong> - <span>{meta.author}</span>
-        </p>
-      </header>
-
-      <div className="border border-b border-primary/20 w-full mb-5" />
-
+    <BlogArticle>
+      <BlogHeader
+        title={meta.title}
+        description={meta.description}
+        author={meta.author}
+      />
       <div className="space-y-16">
         {steps.map((step) => (
-          <section key={step.number}>
-            <div className="flex items-baseline gap-3 mb-4">
-              <span className="text-orange-700 font-mono text-2xl">
-                {step.number}
-              </span>
-              <h2 className="text-2xl font-semibold tracking-tight">
-                {step.title}
-              </h2>
-            </div>
-
-            <div className="text-neutral-800 leading-relaxed space-y-3">
-              {step.body}
-            </div>
-
-            <figure className="mt-6">
-              <div className="relative w-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
-                <Image
-                  src={step.image}
-                  alt={step.alt}
-                  width={1280}
-                  height={720}
-                  sizes="(max-width: 768px) 100vw, 768px"
-                  className="w-full h-auto"
-                />
-              </div>
-              <figcaption className="text-sm text-neutral-500 mt-2">
-                {step.alt}
-              </figcaption>
-            </figure>
-          </section>
+          <BlogStep key={step.number} {...step} />
         ))}
       </div>
-    </article>
+    </BlogArticle>
   );
 }
