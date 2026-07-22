@@ -2,6 +2,7 @@ import BlogArticle from "@/components/blog/blogArticle";
 import BlogHeader from "@/components/blog/blogHeader";
 import BlogStep from "@/components/blog/blogStep";
 import Link from "next/link";
+import { StepTypes } from "./type";
 
 const IMG_DIR =
   "/images/blog/posts/how-to-migrate-shopify-products-to-wordpress";
@@ -14,7 +15,7 @@ export const meta = {
   author: "Migration Master Editorial Team",
 };
 
-const steps = [
+const steps: StepTypes[] = [
   {
     number: "01",
     title: "Know your destination before you export",
