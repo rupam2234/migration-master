@@ -157,14 +157,13 @@
 
 @media (min-width: 980px) {
     .mm-hero {
-        grid-template-columns: 1.05fr 0.95fr;
+        grid-template-columns: 1.2fr 0.8fr;
         align-items: center;
     }
 }
-
 .mm-h1 {
-    font-size: clamp(2.1rem, 4.6vw, 3.4rem);
-    line-height: 1.04;
+    font-size: clamp(1.9rem, 3.8vw, 2.8rem);
+    line-height: 1.1;
     margin: 14px 0 18px;
 }
 
@@ -720,4 +719,179 @@ font-family: var(--font-display), sans-serif;    font-weight: 700;
 
 .mm-footer-links a:hover {
     color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Route picker (hero)                                                    */
+/* ---------------------------------------------------------------------- */
+
+.mm-route-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 20px 0 24px;
+    padding: 10px 12px;
+    border: 1px solid var(--paper-line);
+    background: var(--paper-deep);
+    width: fit-content;
+}
+
+.mm-route-select {
+    appearance: none;
+    font-family: var(--font-mono), monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.03em;
+    color: var(--ink);
+    border: 1px solid var(--paper-line);
+    background: #F6F1E6;
+    padding: 7px 26px 7px 10px;
+    cursor: pointer;
+    min-width: 118px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%),
+        linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%);
+    background-position: calc(100% - 14px) center, calc(100% - 9px) center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+
+.mm-route-select:focus-visible {
+    outline: 2px solid var(--route);
+    outline-offset: 2px;
+}
+
+.mm-route-swap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--paper-line);
+    background: var(--paper);
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: transform 0.2s ease, color 0.15s ease;
+}
+
+.mm-route-swap:hover {
+    color: var(--route);
+    transform: rotate(180deg);
+}
+
+.mm-route-status-live,
+.mm-route-status-soon {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono), monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 9px;
+}
+
+.mm-route-status-live {
+    color: var(--route);
+    background: rgba(47, 111, 98, 0.12);
+    border: 1px solid rgba(47, 111, 98, 0.3);
+}
+
+.mm-route-status-soon {
+    color: var(--stamp);
+    background: rgba(162, 59, 46, 0.1);
+    border: 1px solid rgba(162, 59, 46, 0.3);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Browser panel hero — clean dashboard-window look, no perforated/       */
+/* scalloped edge. Slightly rounded corners deliberately distinguish it   */
+/* from the flat, sharp-edged paper cards elsewhere: this is a screenshot */
+/* of software, not a printed form.                                      */
+/* ---------------------------------------------------------------------- */
+
+.mm-browser-wrap {
+    display: flex;
+    justify-content: right;
+}
+
+.mm-browser {
+    width: 100%;
+    max-width: 420px;
+    background: #F6F1E6;
+    border: 1px solid var(--paper-line);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 24px 48px -28px rgba(28, 43, 51, 0.35);
+}
+
+.mm-browser-chrome {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--paper-deep);
+    border-bottom: 1px solid var(--paper-line);
+}
+
+.mm-browser-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--manila);
+}
+
+.mm-browser-dot:nth-child(1) {
+    background: var(--stamp);
+}
+
+.mm-browser-dot:nth-child(2) {
+    background: var(--manila);
+}
+
+.mm-browser-dot:nth-child(3) {
+    background: var(--route);
+}
+
+.mm-browser-address {
+    margin-left: 8px;
+    font-family: var(--font-mono), monospace;
+    font-size: 0.7rem;
+    color: var(--ink-soft);
+    background: var(--paper);
+    border: 1px solid var(--paper-line);
+    border-radius: 4px;
+    padding: 4px 10px;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-browser-body {
+    padding: 22px 22px 18px;
+}
+
+.mm-browser-titlebar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1.5px solid var(--ink);
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    font-family: var(--font-display), sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+}
+
+.mm-browser-status {
+    font-family: var(--font-mono), monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--route);
+    background: rgba(47, 111, 98, 0.12);
+    border: 1px solid rgba(47, 111, 98, 0.3);
+    border-radius: 3px;
+    padding: 3px 8px;
 }
