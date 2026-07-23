@@ -32,7 +32,7 @@ const ROUTES = [
 const TIERS = [
   {
     name: "Migration",
-    range: "Up to 20,000 items",
+    range: "Products, orders, pages, blogs and media are counted individually.",
     rate: 0.2,
     minimum: 1,
     icon: Package,
@@ -63,7 +63,7 @@ const STEPS = [
   },
   {
     n: "02",
-    title: "Review the manifest",
+    title: "Preview your export",
     body: "See exactly how many images, posts, pages, and categories will move — before you pay for anything.",
   },
   {
@@ -188,7 +188,7 @@ export default function Main() {
               Move from Shopify to WordPress
               <br />
               <span className={styles["mm-accent"]}>
-                Export products, orders, pages, blogs, and media.
+                Export your products, orders, pages, blogs, and media.
               </span>
             </h1>
             <p className={styles["mm-sub"]}>
