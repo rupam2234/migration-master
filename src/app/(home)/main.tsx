@@ -12,6 +12,9 @@ import {
   ChevronDown,
   Package,
   Circle,
+  ShieldCheck,
+  Database,
+  FileCheck,
   ShoppingCart,
 } from "lucide-react";
 import styles from "./style.module.css";
@@ -152,6 +155,29 @@ const NAV_ITEMS = [
   { link: "#what-moves", title: "What moves" },
   { link: "#pricing", title: "Pricing" },
   { link: "#faq", title: "FAQ" },
+];
+
+const TRUST = [
+  {
+    icon: ShieldCheck,
+    title: "No Shopify credentials required",
+    body: "Connect securely with required permissions, generate your export, then disconnect.",
+  },
+  {
+    icon: FileCheck,
+    title: "Preview before you pay",
+    body: "See an itemized manifest showing exactly what will be exported before purchasing anything.",
+  },
+  {
+    icon: Database,
+    title: "Uses WordPress's native importer",
+    body: "Outputs standard WXR files that import through WordPress without proprietary plugins or lock-in.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Keeps your content intact",
+    body: "Images, categories, slugs, and metadata stay linked so your content arrives ready to use.",
+  },
 ];
 
 function routeIsLive(from: string, to: string) {
@@ -313,6 +339,40 @@ export default function Main() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className={`${styles["mm-section"]} ${styles["mm-section-alt"]}`}
+        >
+          <div className={styles["mm-shell"]}>
+            <h2 className={`${styles["mm-display"]} ${styles["mm-h2"]}`}>
+              Built for reliable migrations
+            </h2>
+
+            <p className={styles["mm-section-lede"]}>
+              No proprietary formats, no lock-in, and no guessing what gets
+              exported. Everything is designed to make moving stores
+              predictable.
+            </p>
+
+            <div className={styles["mm-grid-4"]}>
+              {TRUST.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <div className={styles["mm-card"]} key={item.title}>
+                    <div className={styles["mm-card-icon"]}>
+                      <Icon size={18} />
+                    </div>
+
+                    <div className={styles["mm-card-title"]}>{item.title}</div>
+
+                    <div className={styles["mm-card-body"]}>{item.body}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
