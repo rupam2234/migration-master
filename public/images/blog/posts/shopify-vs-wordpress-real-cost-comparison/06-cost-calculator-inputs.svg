@@ -1,0 +1,65 @@
+<svg viewBox="0 0 700 420" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <rect width="700" height="420" fill="#faf9f7"/>
+
+  <text x="350" y="42" text-anchor="middle" font-size="20" font-weight="700" fill="#1f1f1f">Four inputs decide which platform is cheaper for you</text>
+  <text x="350" y="64" text-anchor="middle" font-size="13" fill="#6b6b6b">Same four questions, every time — no spreadsheet required</text>
+
+  <!-- Four input boxes -->
+  <g>
+    <!-- Box 1 -->
+    <rect x="40" y="100" width="140" height="120" rx="10" fill="#ffffff" stroke="#2b2b2b" stroke-width="1.5"/>
+    <circle cx="110" cy="135" r="18" fill="#2b2b2b"/>
+    <text x="110" y="141" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">1</text>
+    <text x="110" y="172" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">Monthly</text>
+    <text x="110" y="188" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">revenue</text>
+    <text x="110" y="206" text-anchor="middle" font-size="10.5" fill="#8a8a8a">fees scale with this</text>
+
+    <!-- Box 2 -->
+    <rect x="200" y="100" width="140" height="120" rx="10" fill="#ffffff" stroke="#2b2b2b" stroke-width="1.5"/>
+    <circle cx="270" cy="135" r="18" fill="#2b2b2b"/>
+    <text x="270" y="141" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">2</text>
+    <text x="270" y="172" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">Number of</text>
+    <text x="270" y="188" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">paid apps</text>
+    <text x="270" y="206" text-anchor="middle" font-size="10.5" fill="#8a8a8a">needed to run the store</text>
+
+    <!-- Box 3 -->
+    <rect x="360" y="100" width="140" height="120" rx="10" fill="#ffffff" stroke="#2b2b2b" stroke-width="1.5"/>
+    <circle cx="430" cy="135" r="18" fill="#2b2b2b"/>
+    <text x="430" y="141" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">3</text>
+    <text x="430" y="172" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">DIY comfort</text>
+    <text x="430" y="188" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">or dev budget</text>
+    <text x="430" y="206" text-anchor="middle" font-size="10.5" fill="#8a8a8a">maintenance cost</text>
+
+    <!-- Box 4 -->
+    <rect x="520" y="100" width="140" height="120" rx="10" fill="#ffffff" stroke="#2b2b2b" stroke-width="1.5"/>
+    <circle cx="590" cy="135" r="18" fill="#2b2b2b"/>
+    <text x="590" y="141" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">4</text>
+    <text x="590" y="172" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">Predictability</text>
+    <text x="590" y="188" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f1f1f">vs. scale</text>
+    <text x="590" y="206" text-anchor="middle" font-size="10.5" fill="#8a8a8a">fixed cost or lower at volume</text>
+  </g>
+
+  <!-- Connecting lines down to the funnel -->
+  <path d="M110,220 L110,250 L350,250" stroke="#c2c2c2" stroke-width="1.5" fill="none"/>
+  <path d="M270,220 L270,250 L350,250" stroke="#c2c2c2" stroke-width="1.5" fill="none"/>
+  <path d="M430,220 L430,250 L350,250" stroke="#c2c2c2" stroke-width="1.5" fill="none"/>
+  <path d="M590,220 L590,250 L350,250" stroke="#c2c2c2" stroke-width="1.5" fill="none"/>
+  <line x1="350" y1="250" x2="350" y2="270" stroke="#c2c2c2" stroke-width="1.5"/>
+
+  <!-- Result split -->
+  <g transform="translate(150,280)">
+    <rect x="0" y="0" width="180" height="80" rx="8" fill="#2b2b2b"/>
+    <text x="90" y="32" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">Low revenue, high app</text>
+    <text x="90" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">dependency, low DIY</text>
+    <text x="90" y="70" text-anchor="middle" font-size="13" font-weight="800" fill="#fdba74">→ Shopify usually wins</text>
+  </g>
+
+  <g transform="translate(370,280)">
+    <rect x="0" y="0" width="180" height="80" rx="8" fill="#c2410c"/>
+    <text x="90" y="32" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">Growing revenue,</text>
+    <text x="90" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">comfortable self-managing</text>
+    <text x="90" y="70" text-anchor="middle" font-size="13" font-weight="800" fill="#ffe4d1">→ WordPress usually wins</text>
+  </g>
+
+  <text x="350" y="400" text-anchor="middle" font-size="12" fill="#8a8a8a">The gap widens in WordPress's favor as revenue grows</text>
+</svg>

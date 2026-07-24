@@ -58,8 +58,9 @@ const steps: StepTypes[] = [
             Google already recognizes?
           </li>
           <li>
-            <strong>301 redirects</strong>does the old address point at the new
-            one?
+            <strong>Imported URL rewriting</strong>—do links inside your posts
+            and pages update to the new WordPress URLs instead of continuing to
+            point at the old Shopify site?
           </li>
           <li>
             <strong>Image continuity</strong>do your images keep their alt text
@@ -106,25 +107,26 @@ const steps: StepTypes[] = [
   },
   {
     number: "04",
-    title: "301 redirects: closing the loop",
+    title: "Imported URL rewriting: keeping your content connected",
     image: `${IMG_DIR}/04-redirect-chain.svg`,
     alt: "Diagram showing a 301 redirect chain from an old Shopify URL through a search engine to the new WordPress URL",
     body: (
       <>
         <p>
-          Even with perfect slugs, your old Shopify domain still exists in
-          Google&apos;s index, in backlinks from other sites, and in
-          people&apos;s bookmarks. A{" "}
-          <strong>301 redirect tells search engines (and browsers)</strong> that
-          the move is permanent, so ranking signal flows to the new address
-          instead of dead-ending.
+          During the WordPress import, leave{" "}
+          <strong>
+            "Change all imported URLs that currently link to the previous site"
+          </strong>{" "}
+          enabled. This updates links inside your imported posts and pages so
+          they point to your new WordPress content instead of the old Shopify
+          URLs.
         </p>
+
         <p className="mt-4">
-          This part happens outside any migration toolit&apos;s a rule you add
-          at the DNS or host level once your new WordPress site is live, or
-          Shopify-side if you&apos;re keeping the old domain temporarily. Build
-          your redirect map from the export manifest before you cut over, not
-          after.
+          Combined with <strong>Download and import file attachments</strong>,
+          this helps preserve your internal linking structure and media
+          references without requiring you to manually edit hundreds of posts
+          after the migration.
         </p>
       </>
     ),
@@ -265,6 +267,90 @@ const steps: StepTypes[] = [
             free manifest preview
           </Link>{" "}
           before you commit to anything.
+        </p>
+      </>
+    ),
+  },
+  {
+    number: "10",
+    title: "A worked example: redirecting a real Shopify store",
+    body: (
+      <>
+        <p>
+          Here&apos;s what this looks like end to end, using a typical store
+          moving from{" "}
+          <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+            yourstore.com
+          </code>{" "}
+          on Shopify to the same domain on WordPress.
+        </p>
+        <ol className="list-decimal pl-6 mt-4 space-y-3">
+          <li>
+            <strong>Export with Migration Master</strong> and check the
+            manifest. Say it shows products living at{" "}
+            <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+              /product/canvas-tote-bag
+            </code>{" "}
+            in WordPress, versus{" "}
+            <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+              /products/canvas-tote-bag
+            </code>{" "}
+            on Shopify. That&apos;s the only structural change you need a rule
+            for&mdash;everything else (blog posts, pages) keeps its slug.
+          </li>
+          <li>
+            <strong>Point DNS at your new host</strong> once the WordPress
+            import is complete and you&apos;ve spot-checked it.
+          </li>
+          <li>
+            <strong>Add one wildcard redirect rule</strong> instead of hundreds
+            of individual ones. If your host uses Apache, this goes in your{" "}
+            <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+              .htaccess
+            </code>
+            :
+            <pre className="bg-primary/10 p-3 rounded-sm mt-2 overflow-x-auto">
+              <code>{`RedirectMatch 301 ^/products/(.*)$ /product/$1`}</code>
+            </pre>
+            This single line catches every product URL automatically&mdash;
+            <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+              /products/canvas-tote-bag
+            </code>{" "}
+            now 301s to{" "}
+            <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+              /product/canvas-tote-bag
+            </code>
+            .
+          </li>
+          <li>
+            <strong>Leave blog and page URLs alone.</strong> Since Migration
+            Master preserves those slugs exactly, a post that lived at{" "}
+            <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+              /blogs/news/sustainable-packaging
+            </code>{" "}
+            needs its own redirect only if your Shopify blog prefix (
+            <code className="bg-primary/10 px-2 py-0.5 rounded-sm">
+              /blogs/news/
+            </code>
+            ) differs from your new WordPress permalink structure. If they
+            match, no rule is needed at all.
+          </li>
+          <li>
+            <strong>Test before you celebrate.</strong> Visit five or six of
+            your top-ranking old URLs directly and confirm each one lands on the
+            correct new page with a 301 (not a 302)&mdash;most browser dev tools
+            show this under the Network tab.
+          </li>
+          <li>
+            <strong>Submit your sitemap</strong> in Google Search Console and
+            watch the Coverage report for the next few weeks for any 404s the
+            wildcard missed.
+          </li>
+        </ol>
+        <p className="mt-4">
+          That&apos;s the whole redirect job for most stores: one wildcard rule
+          for the product path change, plus a handful of one-off checks for
+          anything that doesn&apos;t match the pattern.
         </p>
       </>
     ),
