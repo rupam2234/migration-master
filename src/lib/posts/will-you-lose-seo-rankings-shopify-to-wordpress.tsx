@@ -115,7 +115,8 @@ const steps: StepTypes[] = [
         <p>
           During the WordPress import, leave{" "}
           <strong>
-            "Change all imported URLs that currently link to the previous site"
+            &quot;Change all imported URLs that currently link to the previous
+            site&quot;
           </strong>{" "}
           enabled. This updates links inside your imported posts and pages so
           they point to your new WordPress content instead of the old Shopify
