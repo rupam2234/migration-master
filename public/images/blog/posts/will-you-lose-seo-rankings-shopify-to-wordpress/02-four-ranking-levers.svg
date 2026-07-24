@@ -1,0 +1,52 @@
+<svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="420" fill="#faf8f5"/>
+
+  <!-- Title bar -->
+  <text x="450" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#1f2937">
+    What actually decides if you keep your rankings
+  </text>
+
+  <!-- 4 cards -->
+  <g font-family="Arial, sans-serif">
+    <!-- Card 1 -->
+    <rect x="40" y="80" width="190" height="290" rx="14" fill="#ffffff" stroke="#e8ded3" stroke-width="2"/>
+    <circle cx="135" cy="140" r="28" fill="#fef1e6"/>
+    <text x="135" y="149" text-anchor="middle" font-size="24" fill="#c2551a">1</text>
+    <text x="135" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">URL &amp;</text>
+    <text x="135" y="220" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">slug parity</text>
+    <text x="135" y="250" text-anchor="middle" font-size="12" fill="#6b7280">Same path,</text>
+    <text x="135" y="266" text-anchor="middle" font-size="12" fill="#6b7280">new platform</text>
+
+    <!-- Card 2 -->
+    <rect x="250" y="80" width="190" height="290" rx="14" fill="#ffffff" stroke="#e8ded3" stroke-width="2"/>
+    <circle cx="345" cy="140" r="28" fill="#fef1e6"/>
+    <text x="345" y="149" text-anchor="middle" font-size="24" fill="#c2551a">2</text>
+    <text x="345" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">301</text>
+    <text x="345" y="220" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">redirects</text>
+    <text x="345" y="250" text-anchor="middle" font-size="12" fill="#6b7280">Old domain</text>
+    <text x="345" y="266" text-anchor="middle" font-size="12" fill="#6b7280">to new home</text>
+
+    <!-- Card 3 -->
+    <rect x="460" y="80" width="190" height="290" rx="14" fill="#ffffff" stroke="#e8ded3" stroke-width="2"/>
+    <circle cx="555" cy="140" r="28" fill="#fef1e6"/>
+    <text x="555" y="149" text-anchor="middle" font-size="24" fill="#c2551a">3</text>
+    <text x="555" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">Image</text>
+    <text x="555" y="220" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">continuity</text>
+    <text x="555" y="250" text-anchor="middle" font-size="12" fill="#6b7280">Alt text &amp;</text>
+    <text x="555" y="266" text-anchor="middle" font-size="12" fill="#6b7280">filenames stay</text>
+
+    <!-- Card 4 -->
+    <rect x="670" y="80" width="190" height="290" rx="14" fill="#ffffff" stroke="#e8ded3" stroke-width="2"/>
+    <circle cx="765" cy="140" r="28" fill="#fef1e6"/>
+    <text x="765" y="149" text-anchor="middle" font-size="24" fill="#c2551a">4</text>
+    <text x="765" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">Internal</text>
+    <text x="765" y="220" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">links</text>
+    <text x="765" y="250" text-anchor="middle" font-size="12" fill="#6b7280">Posts still</text>
+    <text x="765" y="266" text-anchor="middle" font-size="12" fill="#6b7280">point to posts</text>
+  </g>
+
+  <!-- bottom caption -->
+  <text x="450" y="400" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#9ca3af">
+    Miss any one of these and Google has to re-discover and re-evaluate the page from scratch.
+  </text>
+</svg>

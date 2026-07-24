@@ -1,0 +1,40 @@
+<svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="300" fill="#faf8f5"/>
+
+  <text x="450" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#1f2937">
+    Closing the loop with a 301
+  </text>
+
+  <!-- Old URL box -->
+  <rect x="40" y="100" width="230" height="90" rx="12" fill="#ffffff" stroke="#e8ded3" stroke-width="2"/>
+  <text x="155" y="135" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#9ca3af">OLD (Shopify)</text>
+  <text x="155" y="160" text-anchor="middle" font-family="monospace" font-size="13" fill="#1f2937">/blogs/news/post-slug</text>
+
+  <!-- arrow 1 -->
+  <line x1="270" y1="145" x2="345" y2="145" stroke="#c2551a" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="307" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#c2551a">301</text>
+
+  <!-- Middle box: search engine -->
+  <rect x="345" y="90" width="210" height="110" rx="12" fill="#fef1e6" stroke="#f0c9a3" stroke-width="2"/>
+  <text x="450" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#9ca3af">SEARCH ENGINE</text>
+  <text x="450" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#1f2937">sees a permanent move,</text>
+  <text x="450" y="173" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#1f2937">transfers ranking signal</text>
+
+  <!-- arrow 2 -->
+  <line x1="555" y1="145" x2="630" y2="145" stroke="#c2551a" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <!-- New URL box -->
+  <rect x="630" y="100" width="230" height="90" rx="12" fill="#ffffff" stroke="#e8ded3" stroke-width="2"/>
+  <text x="745" y="135" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#9ca3af">NEW (WordPress)</text>
+  <text x="745" y="160" text-anchor="middle" font-family="monospace" font-size="13" fill="#1f2937">/post-slug</text>
+
+  <text x="450" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#9ca3af">
+    Migration Master keeps the slug identical on export — you still need to add the redirect rule on your host.
+  </text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#c2551a"/>
+    </marker>
+  </defs>
+</svg>
