@@ -5,6 +5,6 @@ export { decryptToken, encryptToken } from "./tokenEncryption";
 export { generateWXR, generateWXRChunks } from "./wxr_generator";
 export type { WXRConfig } from "./wxr_generator"
 export { refreshShopifyAccessToken } from "./shopify-refresh";
-export { getCouponDiscount } from "./getCoupon"
-export { createExportFingerprint } from "./exportFingerprint"
+export { getCoupon } from "./getCoupon"
 export { resend } from "./resend"
+export { envInt } from "./env"

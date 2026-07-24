@@ -1,14 +1,14 @@
 import { pool } from "@/lib";
 
-export async function getCouponDiscount(
+export async function getCoupon(
     coupon?: string,
-): Promise<number> {
-    if (!coupon) return 0;
+): Promise<{ id: number; percentOff: number } | null> {
+    if (!coupon) return null;
 
     try {
         const result = await pool.query(
             `
-                SELECT percent_off
+                SELECT id, percent_off
                 FROM coupons
                 WHERE code = $1
                 AND active = true
@@ -21,10 +21,14 @@ export async function getCouponDiscount(
             [coupon.trim().toUpperCase()],
         );
 
-        return Number(result[0]?.percent_off ?? 0);
+        if (!result[0]) return null;
 
+        return {
+            id: result[0].id,
+            percentOff: Number(result[0].percent_off),
+        };
     } catch (error) {
         console.error("Coupon lookup failed:", error);
-        return 0;
+        return null;
     }
 }

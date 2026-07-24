@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { getCurrentUser, pool, resend } from "@/lib";
+import { getCurrentUser, pool, resend, envInt } from "@/lib";
 import { emailTemplate } from "@/components";
+
+const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 2);
+const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
+const COUPON_USE_LIMIT_PER_SHOP = envInt("COUPON_USE_LIMIT_PER_SHOP", 1);
 
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
@@ -11,19 +15,20 @@ export async function POST(req: NextRequest) {
         razorpay_payment_id,
         razorpay_order_id,
         razorpay_signature,
-        fingerprint,
         shopDomain,
-        itemCount,
+        resource,
+        itemIds,
+        couponId,
     } = await req.json();
 
-    if (!fingerprint || !shopDomain || !itemCount) {
+    if (!shopDomain || !resource || !Array.isArray(itemIds) || itemIds.length === 0) {
         return NextResponse.json(
             {
                 success: false,
-                error: "Missing export information"
+                error: "Missing export information",
             },
             {
-                status: 400
+                status: 400,
             }
         );
     }
@@ -38,44 +43,122 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    // Re-derive what's actually new server-side — never trust the client's
+    // claim that these ids are unowned, same principle as create-order.
+    const owned = await pool.query(
+        `
+            SELECT item_id
+            FROM exported_items
+            WHERE shop_domain = $1 AND resource = $2 AND item_id = ANY($3)
+        `,
+        [shopDomain, resource, itemIds],
+    );
+    const ownedIds = new Set(owned.map((r: any) => r.item_id));
+    const newItemIds = itemIds.filter((id: string) => !ownedIds.has(id));
+
+    const recordOwnership = async (exportJobId: string) => {
+        if (newItemIds.length === 0) return;
+
+        const values = newItemIds
+            .map(
+                (_: string, i: number) =>
+                    `($1, $2, $${i + 3}, $${newItemIds.length + 3})`,
+            )
+            .join(",");
+
+        await pool.query(
+            `
+                INSERT INTO exported_items (shop_domain, resource, item_id, export_job_id)
+                VALUES ${values}
+                ON CONFLICT (shop_domain, resource, item_id) DO NOTHING
+            `,
+            [shopDomain, resource, ...newItemIds, exportJobId],
+        );
+    };
+
     if (
         razorpay_payment_id === "FREE" &&
         razorpay_order_id === "FREE" &&
         razorpay_signature === "FREE"
     ) {
+        let eligible = false;
+
+        if (newItemIds.length === 0) {
+            // Nothing new to grant — everything requested is already owned.
+            eligible = true;
+        } else if (couponId) {
+            // Free via a 100%-off coupon — enforce the coupon's own
+            // per-shop usage cap, not the unrelated free-tier item limit.
+            const couponUsage = await pool.query(
+                `
+                    SELECT COUNT(*) AS uses
+                    FROM export_jobs
+                    WHERE coupon_id = $1 AND shop_domain = $2
+                      AND status IN ('PAID','FREE')
+                `,
+                [couponId, shopDomain]
+            );
+
+            const usesSoFar = Number(couponUsage[0].uses);
+            eligible = usesSoFar < COUPON_USE_LIMIT_PER_SHOP;
+        } else {
+            // Free via the free tier — enforce the tier's own limits.
+            const freeUsage = await pool.query(
+                `
+                    SELECT COUNT(*) AS free_count
+                    FROM export_jobs
+                    WHERE shop_domain = $1 AND status = 'FREE'
+                `,
+                [shopDomain]
+            );
+
+            const freeCount = Number(freeUsage[0].free_count);
+            eligible =
+                freeCount < FREE_EXPORT_LIMIT &&
+                newItemIds.length <= FREE_ITEM_LIMIT;
+        }
+
+        if (!eligible) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "Not eligible for a free export",
+                },
+                { status: 403 }
+            );
+        }
+
         const job = await pool.query(
             `
                 INSERT INTO export_jobs
                 (
                     user_id,
-                    fingerprint,
                     shop_domain,
                     item_count,
-                    status
+                    status,
+                    coupon_id
                 )
                 VALUES
-                ($1,$2,$3,$4,'FREE')
-                ON CONFLICT (fingerprint)
-                DO UPDATE SET
-                    status='FREE'
+                ($1,$2,$3,'FREE',$4)
                 RETURNING id
             `,
             [
                 userId,
-                fingerprint,
                 shopDomain,
-                Number(itemCount),
+                newItemIds.length,
+                couponId ?? null,
             ]
         );
 
+        const exportJobId = job[0].id;
+        await recordOwnership(exportJobId);
 
         return NextResponse.json({
             success: true,
             free: true,
-            exportJobId: job[0].id,
+            exportJobId,
         });
     }
-
 
     if (
         !razorpay_payment_id ||
@@ -91,12 +174,10 @@ export async function POST(req: NextRequest) {
         );
     }
 
-
     const body =
         razorpay_order_id +
         "|" +
         razorpay_payment_id;
-
 
     const expectedSignature = crypto
         .createHmac(
@@ -105,7 +186,6 @@ export async function POST(req: NextRequest) {
         )
         .update(body)
         .digest("hex");
-
 
     if (expectedSignature !== razorpay_signature) {
         return NextResponse.json(
@@ -117,33 +197,30 @@ export async function POST(req: NextRequest) {
         );
     }
 
-
     const jobResult = await pool.query(
         `
                 INSERT INTO export_jobs
                 (
                     user_id,
-                    fingerprint,
                     shop_domain,
                     item_count,
-                    status
+                    status,
+                    coupon_id
                 )
                 VALUES
-                    ($1,$2,$3,$4,'PAID')
-                ON CONFLICT (fingerprint)
-                    DO UPDATE SET
-                    status='PAID'
+                    ($1,$2,$3,'PAID',$4)
                     RETURNING id
                 `,
         [
             userId,
-            fingerprint,
             shopDomain,
-            Number(itemCount),
+            newItemIds.length,
+            couponId ?? null,
         ]
     );
 
     const exportJobId = jobResult[0].id;
+    await recordOwnership(exportJobId);
 
     await pool.query(
         `
@@ -176,25 +253,24 @@ export async function POST(req: NextRequest) {
             razorpay_order_id,
             razorpay_payment_id,
             razorpay_signature,
-            Number(itemCount),
+            newItemIds.length,
         ]
     );
 
     const baseAddress = process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://migrationmaster.online"
 
-    // notify user
     const html = emailTemplate({
         title: `Payment Confirmation — Shopify to WordPress Export`,
         content: `
         <p>
           Thank you for your payment. Your order for a Shopify to WordPress export
-          has been successfully completed for <strong>${Number(itemCount)} items</strong>
+          has been successfully completed for <strong>${newItemIds.length} items</strong>
           from your store <strong>${shopDomain}</strong>.
         </p>
     
         <p>
           You can view your payment details here:
-          <a
+          
             href="https://razorpay.com/payment/${razorpay_payment_id}"
             style="color:#CC6CE7; text-decoration:underline;"
           >
@@ -205,7 +281,7 @@ export async function POST(req: NextRequest) {
         <p>
           You can find more details about this order and track your export status
           from your
-          <a
+          
             href="${baseAddress}/dashboard/${shopDomain}/export-jobs"
             style="color:#CC6CE7; text-decoration:underline;"
           >

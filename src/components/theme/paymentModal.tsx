@@ -1,6 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { calculateExportPrice } from "@/app";
+
+type PaymentModalProps = {
+  itemIds: string[];
+  open: boolean;
+  shopDomain: string;
+  resource: string;
+  onSuccess: (paymentData?: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+    itemIds?: string[];
+    shopDomain?: string;
+    resource?: string;
+    free?: boolean;
+    couponId?: number | null;
+  }) => void;
+  onClose: () => void;
+};
 
 declare global {
   interface Window {
@@ -8,39 +27,17 @@ declare global {
   }
 }
 
-type PaymentModalProps = {
-  fingerprint: string;
-  open: boolean;
-  shopDomain: string;
-  resource: string;
-  price: {
-    itemCount: number;
-    total: number;
-    formatted: string;
-  };
-  onSuccess: (paymentData?: {
-    razorpay_payment_id: string;
-    razorpay_order_id: string;
-    razorpay_signature: string;
-    fingerprint?: string;
-    shopDomain?: string;
-    resource?: string;
-    itemCount?: number;
-    free?: boolean;
-  }) => void;
-  onClose: () => void;
-};
-
 export function PaymentModal({
   open,
-  price,
-  fingerprint,
+  itemIds,
   shopDomain,
   resource,
   onSuccess,
   onClose,
 }: PaymentModalProps) {
   if (!open) return null;
+
+  const price = calculateExportPrice(itemIds.length);
 
   return (
     <div
@@ -56,15 +53,15 @@ export function PaymentModal({
         </h3>
 
         <p className="text-xs text-gray-400 mb-4">
-          {price.itemCount} record
-          {price.itemCount !== 1 ? "s" : ""} · {price.formatted}
+          {itemIds.length} new record
+          {itemIds.length !== 1 ? "s" : ""} · {price.formatted}
         </p>
 
         <CheckoutWrapper
           price={price}
+          itemIds={itemIds}
           onSuccess={onSuccess}
           onCancel={onClose}
-          fingerprint={fingerprint}
           shopDomain={shopDomain}
           resource={resource}
         />
@@ -75,29 +72,30 @@ export function PaymentModal({
 
 function CheckoutWrapper({
   price,
+  itemIds,
   onSuccess,
   onCancel,
-  fingerprint,
   resource,
   shopDomain,
 }: {
   price: {
-    itemCount: number;
+    count: number;
     total: number;
     formatted: string;
   };
+  itemIds: string[];
   onSuccess: PaymentModalProps["onSuccess"];
   onCancel: () => void;
-  fingerprint: string;
   shopDomain: string;
   resource: string;
 }) {
   const [coupon, setCoupon] = useState("");
+  const [, setCouponId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [finalAmount, setFinalAmount] = useState(price.total);
   const [discount, setDiscount] = useState(0);
   const [couponStatus, setCouponStatus] = useState<
-    "idle" | "checking" | "valid" | "invalid"
+    "idle" | "checking" | "valid" | "invalid" | "used"
   >("idle");
 
   useEffect(() => {
@@ -116,8 +114,14 @@ function CheckoutWrapper({
     };
   }, []);
 
-  const verifyCoupon = async () => {
-    if (!coupon.trim()) return;
+  const verifyCoupon = async (code: string) => {
+    if (!code.trim()) {
+      setDiscount(0);
+      setCouponId(null);
+      setFinalAmount(price.total);
+      setCouponStatus("idle");
+      return;
+    }
 
     setCouponStatus("checking");
 
@@ -128,7 +132,8 @@ function CheckoutWrapper({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          coupon: coupon.trim().toUpperCase(),
+          coupon: code.trim().toUpperCase(),
+          shopDomain,
         }),
       });
 
@@ -136,6 +141,7 @@ function CheckoutWrapper({
 
       if (data.valid) {
         setDiscount(data.discount);
+        setCouponId(data.couponId ?? null);
 
         const newTotal = price.total * (1 - data.discount / 100);
 
@@ -144,14 +150,24 @@ function CheckoutWrapper({
         setCouponStatus("valid");
       } else {
         setDiscount(0);
+        setCouponId(null);
         setFinalAmount(price.total);
-        setCouponStatus("invalid");
+        setCouponStatus(data.reason === "already_used" ? "used" : "invalid");
       }
     } catch (error) {
       console.error(error);
       setCouponStatus("invalid");
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      verifyCoupon(coupon);
+    }, 500);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coupon, shopDomain]);
 
   const startPayment = async () => {
     if (!window.Razorpay) {
@@ -168,9 +184,8 @@ function CheckoutWrapper({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          itemCount: price.itemCount,
+          itemIds,
           coupon: coupon.trim().toUpperCase(),
-          fingerprint,
           shopDomain,
           resource,
         }),
@@ -187,11 +202,11 @@ function CheckoutWrapper({
           razorpay_payment_id: "FREE",
           razorpay_order_id: "FREE",
           razorpay_signature: "FREE",
-          fingerprint: data.fingerprint,
+          itemIds: data.itemIds,
           shopDomain: data.shopDomain,
           resource: data.resource,
-          itemCount: data.itemCount,
           free: true,
+          couponId: data.couponId ?? null,
         });
 
         return;
@@ -201,7 +216,7 @@ function CheckoutWrapper({
       setDiscount(data.discount);
 
       const options = {
-        key: process.env.RAZORPAY_KEY,
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY,
 
         amount: data.amount,
         currency: data.currency,
@@ -217,10 +232,10 @@ function CheckoutWrapper({
         }) => {
           onSuccess({
             ...response,
-            fingerprint,
+            itemIds: data.itemIds,
             shopDomain,
             resource,
-            itemCount: price.itemCount,
+            couponId: data.couponId ?? null,
           });
 
           setLoading(false);
@@ -247,25 +262,16 @@ function CheckoutWrapper({
       <div>
         <label className="text-xs text-gray-500 mb-1 block">Coupon code</label>
 
-        <div className="flex gap-2">
-          <input
-            value={coupon}
-            onChange={(e) => {
-              setCoupon(e.target.value.toUpperCase());
-              setCouponStatus("idle");
-            }}
-            placeholder="SAVE20"
-            className="flex-1 rounded-sm border px-3 py-1.5 text-sm"
-          />
+        <input
+          value={coupon}
+          onChange={(e) => setCoupon(e.target.value.toUpperCase())}
+          placeholder="SAVE20"
+          className="w-full rounded-sm border px-3 py-1.5 text-sm"
+        />
 
-          <button
-            onClick={verifyCoupon}
-            disabled={couponStatus === "checking"}
-            className="rounded-sm border px-3 text-sm"
-          >
-            {couponStatus === "checking" ? "..." : "Apply"}
-          </button>
-        </div>
+        {couponStatus === "checking" && (
+          <p className="text-xs text-gray-400 mt-1">Checking…</p>
+        )}
 
         {couponStatus === "valid" && (
           <p className="text-xs text-green-600 mt-1">
@@ -275,6 +281,12 @@ function CheckoutWrapper({
 
         {couponStatus === "invalid" && (
           <p className="text-xs text-red-500 mt-1">Invalid or expired coupon</p>
+        )}
+
+        {couponStatus === "used" && (
+          <p className="text-xs text-red-500 mt-1">
+            You&apos;ve already used this coupon
+          </p>
         )}
       </div>
 
@@ -308,10 +320,10 @@ function CheckoutWrapper({
 
         <button
           onClick={startPayment}
-          disabled={loading}
+          disabled={loading || couponStatus === "checking"}
           className="flex-1 rounded-sm bg-blue-600 px-3 py-1.5 text-sm text-white"
         >
-          {loading ? "Opening..." : "Pay"}
+          {loading ? "Creating Order..." : "Complete Order"}
         </button>
       </div>
     </div>

@@ -1,25 +1,30 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Check, ChevronLeft, ChevronRight, InfoIcon } from "lucide-react";
-import { calculateExportPrice, ResourceKey } from "@/app";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  InfoIcon,
+  Loader2Icon,
+} from "lucide-react";
+import { ResourceKey } from "@/app";
 import { useProjectContext } from "@/context";
 import { useParams } from "next/navigation";
 import { WPimportProps } from "@/app/api/wordpress/[resources]/import/route";
 import JSZip from "jszip";
 import { PaymentModal } from "@/components/theme/paymentModal";
-import { ToolTip } from "@/components";
-import { createExportFingerprint } from "@/lib/exportFingerprint";
+import { ItemPreview, ToolTip } from "@/components";
 
 type PaymentData = {
   razorpay_payment_id: string;
   razorpay_order_id: string;
   razorpay_signature: string;
-  fingerprint?: string;
   shopDomain?: string;
   resource?: string;
-  itemCount?: number;
+  itemIds?: string[];
   free?: boolean;
+  couponId?: number | null;
 };
 
 const PAGE_SIZE = 11;
@@ -30,13 +35,13 @@ export default function ExportResources() {
   const { shopifyData, wpImportSettings, activeProject } = useProjectContext();
   const key = (params.resources as string).toUpperCase() as ResourceKey;
   const selectedData = shopifyData[key];
-  const [exportFingerprint, setExportFingerprint] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [page, setPage] = useState(0);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [prevFingerprint, setPrevFingerprint] = useState("");
-  const [prevIds, setPrevIds] = useState<Set<string>>(new Set());
+  const [newItemIds, setNewItemIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   const records = useMemo(() => {
     if (!selectedData) return [];
@@ -112,7 +117,7 @@ export default function ExportResources() {
   const generateWordpressImport = async () => {
     if (!key) return;
 
-    // Export only selected records
+    // Export all currently selected records (owned + newly settled)
     const selectedRecords = records.filter((_, i) => selected.has(i));
 
     try {
@@ -157,7 +162,9 @@ export default function ExportResources() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      setLoading(false);
     } catch (error: any) {
+      setLoading(false);
       console.error(
         error.message ?? "Something went wrong generating WordPress import",
       );
@@ -186,8 +193,6 @@ export default function ExportResources() {
     return () => clearTimeout(timer);
   };
 
-  const price = calculateExportPrice(selected.size);
-
   if (!activeProject)
     return (
       <div className="p-8 text-center text-gray-500">No project selected!</div>
@@ -201,22 +206,9 @@ export default function ExportResources() {
     );
   }
 
-  const getSelectedFingerprint = async () => {
-    const ids = records
-      .filter((_, i) => selected.has(i))
-      .map((item: any) => item.id)
-      .filter(Boolean);
-    // If we already have a fingerprint and the current ids are a subset of previous ids, reuse it
-    if (prevFingerprint && ids.every((id) => prevIds.has(id))) {
-      return prevFingerprint;
-    }
-    const newFingerprint = await createExportFingerprint(ids);
-    setPrevFingerprint(newFingerprint);
-    setPrevIds(new Set(ids));
-    return newFingerprint;
-  };
-
   const gridTemplate = `40px repeat(${columns.length}, minmax(120px, 1fr))`;
+
+  const previewItem = visible[previewIndex] ?? visible[0] ?? null;
 
   return (
     <div>
@@ -237,9 +229,9 @@ export default function ExportResources() {
                   Selection & Pricing
                 </p>
                 <p className="pt-2">
-                  If you have already paid for a set of items, any new export
-                  that selects a <strong>subset</strong> of those items is
-                  available instantly. No additional payment steps required.
+                  Items you&apos;ve already paid for (or received free) are
+                  never charged again, even if your current selection also
+                  includes new items.
                 </p>
               </div>
             }
@@ -284,11 +276,17 @@ export default function ExportResources() {
           />
 
           <button
-            className="rounded-sm text-xs md:text-sm px-2 py-1 hover:bg-blue-600/70 bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            className="rounded-sm min-w-[135px] text-xs md:text-sm px-2 py-1 hover:bg-blue-600/70 
+            bg-blue-600/80 text-white disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
             onClick={async () => {
               if (!activeProject) return;
 
-              const fingerprint = await getSelectedFingerprint();
+              setLoading(true);
+
+              const itemIds = records
+                .filter((_, i) => selected.has(i))
+                .map((item: any) => item.id)
+                .filter(Boolean);
 
               const res = await fetch("/api/payment/check-export", {
                 method: "POST",
@@ -296,25 +294,30 @@ export default function ExportResources() {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  fingerprint,
                   shopDomain: activeProject,
                   resource: key,
+                  itemIds,
                 }),
               });
-
               const data = await res.json();
 
-              if (data.paid) {
+              if (data.allOwned) {
                 await generateWordpressImport();
                 return;
               }
 
-              setExportFingerprint(fingerprint);
+              setNewItemIds(data.newItemIds ?? []);
               setShowPaymentModal(true);
             }}
-            disabled={selected.size === 0}
+            disabled={loading}
           >
-            Export {selected.size} Record{selected.size !== 1 ? "s" : ""}
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <Loader2Icon className="animate-spin" size={19} />
+              </span>
+            ) : (
+              `Export ${selected.size} Record${selected.size !== 1 ? "s" : ""}`
+            )}
           </button>
         </div>
       </div>
@@ -327,159 +330,183 @@ export default function ExportResources() {
         className="mb-4 w-full max-w-sm rounded-md border border-gray-300 px-3 py-1.5 text-sm"
       />
 
-      <div className="relative overflow-hidden rounded-md border border-gray-200">
-        <div className="overflow-x-auto">
-          <div className="min-w-full">
-            {/* Header row */}
-            <div
-              className="grid bg-gray-50 border-b border-gray-200"
-              style={{ gridTemplateColumns: gridTemplate }}
-            >
-              <div className="flex items-center justify-center px-2 py-2">
-                <Checkbox
-                  checked={visible.length > 0 && allVisibleSelected}
-                  onClick={toggleAll}
-                />
-              </div>
-              {columns.map((col) => (
-                <div
-                  key={col}
-                  className="px-3 py-2 text-left text-xs font-medium text-gray-600 truncate"
-                  title={col}
-                >
-                  {col}
-                </div>
-              ))}
-            </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+        {/* ================= TABLE ================= */}
 
-            {visible.map((row, i) => {
-              const globalIndex = safePage * PAGE_SIZE + i;
-              const isSelected = selected.has(globalIndex);
-              return (
+        <div>
+          <div className="relative overflow-hidden rounded-md border border-gray-200">
+            <div className="overflow-x-auto">
+              <div className="min-w-full">
+                {/* Header */}
+
                 <div
-                  key={globalIndex}
-                  onClick={() => toggleRow(globalIndex)}
-                  className={`grid border-b border-gray-100 cursor-pointer transition-colors ${
-                    isSelected ? "" : "hover:bg-gray-50"
-                  }`}
+                  className="grid bg-gray-50 border-b border-gray-200 sticky top-0"
                   style={{ gridTemplateColumns: gridTemplate }}
                 >
-                  <div
-                    className="flex items-center justify-center px-2 py-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="flex items-center justify-center px-2 py-2">
                     <Checkbox
-                      checked={isSelected}
-                      onClick={() => toggleRow(globalIndex)}
+                      checked={visible.length > 0 && allVisibleSelected}
+                      onClick={toggleAll}
                     />
                   </div>
-                  {columns.map((col) => {
-                    const raw = formatCell(
-                      (row as Record<string, unknown>)[col],
-                    );
-                    return (
-                      <div
-                        key={col}
-                        className="px-3 py-2 text-sm truncate"
-                        title={
-                          raw.length > CELL_TRUNCATE_LENGTH ? raw : undefined
-                        }
-                      >
-                        {truncate(raw)}
-                      </div>
-                    );
-                  })}
+
+                  {columns.map((col) => (
+                    <div
+                      key={col}
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-600 truncate"
+                    >
+                      {col}
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
 
-            {visible.length === 0 && (
-              <div className="py-10 text-center text-sm text-gray-400">
-                No records match your search.
+                {visible.map((row, i) => {
+                  const globalIndex = safePage * PAGE_SIZE + i;
+                  const isSelected = selected.has(globalIndex);
+                  const isPreview = previewIndex === i;
+
+                  return (
+                    <div
+                      key={globalIndex}
+                      onMouseEnter={() => setPreviewIndex(i)}
+                      onClick={() => {
+                        toggleRow(globalIndex);
+                        setPreviewIndex(i);
+                      }}
+                      className={`grid cursor-pointer border-b border-gray-100 transition-colors
+                  ${
+                    isPreview
+                      ? "bg-blue-50"
+                      : isSelected
+                        ? ""
+                        : "hover:bg-gray-50"
+                  }
+                `}
+                      style={{ gridTemplateColumns: gridTemplate }}
+                    >
+                      <div
+                        className="flex items-center justify-center px-2 py-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onClick={() => toggleRow(globalIndex)}
+                        />
+                      </div>
+
+                      {columns.map((col) => {
+                        const raw = formatCell(
+                          (row as Record<string, unknown>)[col],
+                        );
+
+                        return (
+                          <div
+                            key={col}
+                            className="px-3 py-2 truncate text-sm"
+                            title={
+                              raw.length > CELL_TRUNCATE_LENGTH
+                                ? raw
+                                : undefined
+                            }
+                          >
+                            {truncate(raw)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+
+                {visible.length === 0 && (
+                  <div className="py-10 text-center text-sm text-gray-400">
+                    No records match your search.
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      </div>
 
-      {totalPages > 1 && (
-        <div className="flex mt-7 items-center justify-end gap-1">
-          <button
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={safePage === 0}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft size={14} />
-          </button>
+          {totalPages > 1 && (
+            <div className="flex mt-7 items-center justify-end gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={safePage === 0}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+              >
+                <ChevronLeft size={14} />
+              </button>
 
-          {(() => {
-            const pages: (number | "...")[] = [];
-            const delta = 1; // pages on each side of current
+              {(() => {
+                const pages: (number | "...")[] = [];
+                const delta = 1;
 
-            const rangeStart = Math.max(1, safePage - delta);
-            const rangeEnd = Math.min(totalPages - 2, safePage + delta);
+                const start = Math.max(1, safePage - delta);
+                const end = Math.min(totalPages - 2, safePage + delta);
 
-            // Always show first page
-            pages.push(0);
+                pages.push(0);
 
-            // Left ellipsis
-            if (rangeStart > 1) pages.push("...");
+                if (start > 1) pages.push("...");
 
-            // Window around current page
-            for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+                for (let i = start; i <= end; i++) pages.push(i);
 
-            // Right ellipsis
-            if (rangeEnd < totalPages - 2) pages.push("...");
+                if (end < totalPages - 2) pages.push("...");
 
-            // Always show last page
-            if (totalPages > 1) pages.push(totalPages - 1);
+                if (totalPages > 1) pages.push(totalPages - 1);
 
-            return pages.map((p, i) =>
-              p === "..." ? (
-                <span
-                  key={`ellipsis-${i}`}
-                  className="w-6 text-center text-gray-300"
-                >
-                  …
-                </span>
-              ) : (
-                <button
-                  key={p}
-                  onClick={() => setPage(p as number)}
-                  className={`w-6 h-6 rounded text-xs font-medium transition-colors ${
+                return pages.map((p, i) =>
+                  p === "..." ? (
+                    <span key={i} className="w-6 text-center text-gray-300">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        setPage(p as number);
+                        setPreviewIndex(0);
+                      }}
+                      className={`w-6 h-6 rounded text-xs font-medium
+                  ${
                     p === safePage
                       ? "bg-blue-600 text-white"
                       : "hover:bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {(p as number) + 1}
-                </button>
-              ),
-            );
-          })()}
+                  }
+                `}
+                    >
+                      {(p as number) + 1}
+                    </button>
+                  ),
+                );
+              })()}
 
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={safePage === totalPages - 1}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ChevronRight size={14} />
-          </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={safePage === totalPages - 1}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* ================= PREVIEW ================= */}
+
+        <div className="sticky top-5 h-fit">
+          <ItemPreview item={previewItem} resource={key} />
+        </div>
+      </div>
 
       <PaymentModal
-        fingerprint={exportFingerprint}
+        itemIds={newItemIds}
         open={showPaymentModal}
         shopDomain={activeProject}
         resource={key}
-        price={{
-          itemCount: selected.size,
-          total: price.total,
-          formatted: price.formatted,
-        }}
         onSuccess={handleExportSuccess}
-        onClose={() => setShowPaymentModal(false)}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setLoading(false);
+        }}
       />
     </div>
   );
