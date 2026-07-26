@@ -117,7 +117,7 @@ const WHAT_MOVES = [
 const FAQS = [
   {
     q: "How do I migrate my store's content to another platform?",
-    a: "You connect your store, then fetch whichever content types you need — Products, Orders, Pages, Blogs, Articles, or Images — from separate cards on the dashboard. Review the itemized manifest for each, then export. You import the resulting files under your new platform's own import tool.",
+    a: "You connect your store, then fetch whichever content types you need — Products, Orders, Pages, Blogs, Articles, or Images — from separate cards on the dashboard. Review the itemized manifest for each, then export. You import the resulting files via WordPress's import tool.",
   },
   {
     q: "Will I lose my SEO rankings when I migrate?",
@@ -145,7 +145,7 @@ const FAQS = [
   },
   {
     q: "Are more platforms coming?",
-    a: "Shopify and WordPress are live in both directions today. Other routes — WooCommerce, Wix, and BigCommerce — are in progress. If you need one that isn't live yet, email support and we'll let you know when it ships.",
+    a: "Shopify to WordPress is live and not the other way around as of now. Other routes — WooCommerce, Wix, and BigCommerce — are in progress. If you need one that isn't live yet, email support and we'll let you know when it ships.",
   },
 ];
 
@@ -218,11 +218,11 @@ export default function Main() {
               </span>
             </h1>
             <p className={styles["mm-sub"]}>
-              We export your products, orders, blog posts, pages, categories,
-              and media library, then package them into WordPress-ready WXR
-              files — the same import format WordPress&apos;s own importer
-              expects. No plugin to install, no missing images, no broken
-              categories.
+              Export your products, orders, blog posts, pages, categories, and
+              media library from shopify store, then package them into
+              WordPress-ready WXR files — the same import format
+              WordPress&apos;s own importer expects. No plugin required, avoids
+              broken links and images.
             </p>
 
             <div className={styles["mm-route-picker"]}>
@@ -287,10 +287,10 @@ export default function Main() {
 
             <div className={styles["mm-chip-row"]}>
               <span className={styles["mm-chip"]}>
-                <CheckCircle2 size={13} /> Products &amp; orders included
+                <CheckCircle2 size={13} /> Takes only few minutes
               </span>
               <span className={styles["mm-chip"]}>
-                <CheckCircle2 size={13} /> Outputs valid WXR
+                <CheckCircle2 size={13} /> Chunked for safe import
               </span>
               <span className={styles["mm-chip"]}>
                 <CheckCircle2 size={13} /> Images keep alt text
