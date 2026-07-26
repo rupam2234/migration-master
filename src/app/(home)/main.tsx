@@ -347,9 +347,24 @@ export default function Main() {
           className={`${styles["mm-section"]} ${styles["mm-section-alt"]}`}
         >
           <div className={styles["mm-shell"]}>
-            <h2 className={`${styles["mm-display"]} ${styles["mm-h2"]}`}>
-              Built for reliable migrations
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className={`${styles["mm-display"]} ${styles["mm-h2"]}`}>
+                Built for reliable migrations
+              </h2>
+              <a
+                href="https://www.producthunt.com/products/migration-master?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-migration-master"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden md:block"
+              >
+                <img
+                  alt="Migration Master - Move your Shopify store to WordPress without the mess | Product Hunt"
+                  width="250"
+                  height="54"
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1203425&amp;theme=light&amp;t=1785046874803"
+                />
+              </a>
+            </div>
 
             <p className={styles["mm-section-lede"]}>
               No proprietary formats, no lock-in, and no guessing what gets
