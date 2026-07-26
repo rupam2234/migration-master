@@ -33,9 +33,10 @@ export function Footer({ links }: FooterProps) {
           ) : (
             <>
               <Link href={"/blog"}>Blog</Link>
-              <Link href="#how-it-works">How it works</Link>{" "}
-              <Link href="#what-moves">What moves</Link>{" "}
-              <Link href="#pricing">Pricing</Link> <Link href="#faq">FAQ</Link>
+              <Link href="/privacy-policy">Privacy Policy</Link>{" "}
+              <Link href="/terms-of-service">Terms</Link>{" "}
+              <Link href="/refund-policy">Refund Policy</Link>{" "}
+              <Link href="/contact">Contact</Link>
             </>
           )}
         </nav>

@@ -84,9 +84,22 @@ export async function POST(request: Request) {
     await resend.emails.send({
       from: "Migration Master <client@migrationmaster.online>",
       to: [email],
-      cc: ["support@migrationmaster.online"],
       subject: `Welcome to Migration Master`,
       html,
+    });
+
+    // Separate heads-up to your personal inbox — its own independent send,
+    // not a CC/BCC on the welcome email above, and unrelated to it in content.
+    await resend.emails.send({
+      from: "Migration Master <notifications@migrationmaster.online>",
+      to: ["rupam.krishna999@gmail.com"],
+      subject: `New signup: ${name}`,
+      text: [
+        `Name: ${name}`,
+        `Email: ${email}`,
+      ].join("\n"),
+    }).catch((err) => {
+      console.error("Signup notification email failed:", err);
     });
 
     return Response.json(result, { status: 201 });
