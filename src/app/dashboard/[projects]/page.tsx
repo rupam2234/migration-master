@@ -5,7 +5,6 @@ import {
   FileTextIcon,
   NewspaperIcon,
   ShoppingCartIcon,
-  PenSquareIcon,
   Loader2Icon,
   ArrowRightIcon,
   Layers,
@@ -21,7 +20,7 @@ const ResourceTypes = {
   PRODUCTS: "products",
   ORDERS: "orders",
   ARTICLES: "articles",
-  SINGLE_ARTICLE: "single_article",
+  // SINGLE_ARTICLE: "single_article",
   IMAGES: "images",
 } as const satisfies Record<string, Resurces>;
 
@@ -64,17 +63,18 @@ const RESOURCE_CONFIG: Record<ResourceKey, Services> = {
     icon: Layers,
     accent: "bg-orange-500/10 text-orange-600",
   },
-  SINGLE_ARTICLE: {
-    type: "single_article",
-    label: "Unique Article/Blog",
-    description: "Get single article when ID is provided",
-    icon: PenSquareIcon,
-    accent: "bg-fuchsia-500/10 text-fuchsia-600",
-  },
+  // SINGLE_ARTICLE: {
+  //   type: "single_article",
+  //   label: "Unique Article/Blog",
+  //   description: "Get single article when ID is provided",
+  //   icon: PenSquareIcon,
+  //   accent: "bg-fuchsia-500/10 text-fuchsia-600",
+  // },
   IMAGES: {
     type: "images",
-    label: "All Images",
-    description: "Export metadata of your all images",
+    label: "Bulk Image Export (Free up to 3,000 images)",
+    description:
+      "Images attached to products or pages are always included at no extra cost.",
     icon: Image,
     accent: "bg-neon-500/10 text-neon-600",
   },

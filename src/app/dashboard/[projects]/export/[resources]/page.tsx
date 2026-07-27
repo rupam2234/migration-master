@@ -295,7 +295,7 @@ export default function ExportResources() {
                 },
                 body: JSON.stringify({
                   shopDomain: activeProject,
-                  resource: key,
+                  resource: key === "IMAGES" ? "MEDIA_LIBRARY" : key,
                   itemIds,
                 }),
               });
@@ -303,11 +303,23 @@ export default function ExportResources() {
 
               if (data.allOwned) {
                 await generateWordpressImport();
+                setLoading(false);
                 return;
               }
 
+              // Set new items for potential paid export
               setNewItemIds(data.newItemIds ?? []);
+
+              // Free tier for images up to 3000 items
+              if (key === "IMAGES" && (data.newItemIds?.length ?? 0) <= 3000) {
+                await generateWordpressImport();
+                setLoading(false);
+                return;
+              }
+
+              // Show payment modal for paid export
               setShowPaymentModal(true);
+              setLoading(false);
             }}
             disabled={loading}
           >

@@ -19,11 +19,19 @@ import {
 } from "lucide-react";
 import styles from "./style.module.css";
 import { Container, Footer, Header } from "@/components";
+import { calculateTieredPrice, TIERED_PRICING } from "@/lib/pricing/tiered";
 
 const PLATFORMS = [
   { id: "shopify", name: "Shopify" },
   { id: "wordpress", name: "WordPress" },
   { id: "wix", name: "Wix" },
+];
+
+const features = [
+  "Quick API authentication with your store",
+  "Chunked WXR file for default WP import",
+  "Itemized manifest before you pay",
+  "You keep the files, re-import when needed",
 ];
 
 const ROUTES = [
@@ -34,25 +42,38 @@ const ROUTES = [
 
 const TIERS = [
   {
-    name: "Migration",
-    range: "Products, orders, pages, blogs and media are counted individually.",
-    rate: 0.2,
+    name: "Tier 1",
+    range: "1–500 items",
+    rate: TIERED_PRICING.tier1Rate,
     minimum: 1,
     icon: Package,
-    blurb: "Features:",
-    features: [
-      "Quick API authentication with your store",
-      "Chunked WXR file for default WP import",
-      "Itemized manifest before you pay",
-      "Email support",
-    ],
+    blurb: "Base rate",
+    features,
+  },
+  {
+    name: "Tier 2",
+    range: "501–5,000 items",
+    rate: TIERED_PRICING.tier2Rate,
+    minimum: 501,
+    icon: Package,
+    blurb: "Mid‑volume discount",
+    features,
+  },
+  {
+    name: "Tier 3",
+    range: "5,001+ items",
+    rate: TIERED_PRICING.tier3Rate,
+    minimum: 5001,
+    icon: Package,
+    blurb: "High‑volume discount",
+    features,
   },
 ];
 
 const MANIFEST_ROWS = [
   { label: "Products", count: "312", icon: Package },
   { label: "Orders", count: "1,204", icon: ShoppingCart },
-  { label: "Images", count: "4,231", icon: ImageIcon },
+  // { label: "Images", count: "4,231", icon: ImageIcon },
   { label: "Articles", count: "86", icon: FileText },
   { label: "Pages", count: "12", icon: Layers },
   { label: "Categories", count: "5", icon: Tag },
@@ -191,11 +212,7 @@ export default function Main() {
   const [toId, setToId] = useState("wordpress");
 
   const isLive = routeIsLive(fromId, toId);
-  const tier = TIERS[0];
-  const estimate = useMemo(() => {
-    const raw = itemCount * tier.rate;
-    return Math.max(raw, tier.minimum);
-  }, [itemCount, tier]);
+  const estimate = useMemo(() => calculateTieredPrice(itemCount), [itemCount]);
 
   const swapPlatforms = () => {
     setFromId(toId);
@@ -465,9 +482,9 @@ export default function Main() {
               Priced by the item
             </h2>
             <p className={styles["mm-section-lede"]}>
-              A flat fee punishes a small blog and underprices a 20,000-item
-              catalog. So you pay per item exported and prepared for import —
-              the rate drops as volume goes up.
+              A flat fee punishes a small blog and underprices large catalogs.
+              So you pay per item exported and prepared for import — the rate
+              drops as volume goes up.
             </p>
 
             <div className={styles["mm-tiers"]}>
@@ -489,7 +506,7 @@ export default function Main() {
                       </span>
                     </div>
                     <div className={styles["mm-tier-min"]}>
-                      {t.minimum > 0
+                      {t.minimum === 1
                         ? `Free import file generation until ${formatUSD(t.minimum)}`
                         : "No minimum"}
                     </div>
@@ -529,12 +546,22 @@ export default function Main() {
               <div className={styles["mm-calc-receipt"]}>
                 <div className={styles["mm-receipt-row"]}>
                   <span>Tier</span>
-                  <span className={styles["mm-mono"]}>{tier.name}</span>
+                  <span className={styles["mm-mono"]}>
+                    {itemCount <= 500
+                      ? "Tier 1 (0‑500)"
+                      : itemCount <= 5000
+                        ? "Tier 2 (501‑5,000)"
+                        : "Tier 3 (5,001+)"}
+                  </span>
                 </div>
                 <div className={styles["mm-receipt-row"]}>
                   <span>Rate</span>
                   <span className={styles["mm-mono"]}>
-                    ${tier.rate.toFixed(2)} / item
+                    $
+                    {itemCount === 0
+                      ? "0.00"
+                      : (estimate / itemCount).toFixed(2)}{" "}
+                    / item
                   </span>
                 </div>
                 <div className={styles["mm-receipt-total"]}>

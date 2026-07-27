@@ -1,8 +1,10 @@
-import { pool, envInt } from "@/lib";
+import { envInt, pool } from "@/lib";
+import { calculateTieredPrice } from "@/lib/pricing/tiered";
 import { NextRequest, NextResponse } from "next/server";
 
 const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 2);
 const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
+const FREE_IMAGE_LIMIT = envInt("FREE_IMAGE_LIMIT", 3000);
 
 export async function POST(req: NextRequest) {
     const { shopDomain, resource, itemIds } = await req.json();
@@ -52,8 +54,30 @@ export async function POST(req: NextRequest) {
 
     const freeCount = Number(freeUsage[0].free_count);
     const remainingFreeExports = Math.max(0, FREE_EXPORT_LIMIT - freeCount);
-    const eligibleForFree =
-        remainingFreeExports > 0 && newItemIds.length <= FREE_ITEM_LIMIT;
+    let eligibleForFree = false;
+    if (resource === "MEDIA_LIBRARY") {
+        eligibleForFree = newItemIds.length <= FREE_IMAGE_LIMIT;
+    } else {
+        eligibleForFree = remainingFreeExports > 0 && newItemIds.length <= FREE_ITEM_LIMIT;
+    }
+
+    // Compute total cost using tiered pricing
+    let totalCost = 0;
+    if (resource === "MEDIA_LIBRARY") {
+        // Images: free up to FREE_IMAGE_LIMIT, then tiered pricing for excess items
+        if (eligibleForFree) {
+            totalCost = 0;
+        } else {
+            const chargeableCount = newItemIds.length - FREE_IMAGE_LIMIT;
+            totalCost = calculateTieredPrice(chargeableCount);
+        }
+    } else {
+        if (eligibleForFree) {
+            totalCost = 0;
+        } else {
+            totalCost = calculateTieredPrice(newItemIds.length);
+        }
+    }
 
     return NextResponse.json({
         allOwned: false,
@@ -62,5 +86,6 @@ export async function POST(req: NextRequest) {
         newCount: newItemIds.length,
         remainingFreeExports,
         eligibleForFree,
+        totalCost,
     });
 }
