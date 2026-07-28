@@ -13,6 +13,75 @@ export const meta = {
   author: "Migration Master Editorial Team",
 };
 
+// Small reusable visual primitives, kept local to this post so it stays a
+// self-contained drop-in file.
+const Callout = ({
+  tone = "neutral",
+  label,
+  children,
+}: {
+  tone?: "neutral" | "accent" | "success";
+  label?: string;
+  children: React.ReactNode;
+}) => {
+  const toneStyles: Record<string, string> = {
+    neutral: "border-gray-200 bg-gray-50",
+    accent: "border-[#a23b2e]/20 bg-[#a23b2e]/5",
+    success: "border-emerald-200 bg-emerald-50",
+  };
+  const labelStyles: Record<string, string> = {
+    neutral: "text-gray-500",
+    accent: "text-[#a23b2e]",
+    success: "text-emerald-700",
+  };
+  return (
+    <div className={`mt-6 rounded-lg border ${toneStyles[tone]} px-5 py-4`}>
+      {label && (
+        <p
+          className={`text-xs font-semibold uppercase tracking-wide ${labelStyles[tone]} mb-1.5`}
+        >
+          {label}
+        </p>
+      )}
+      <div className="text-sm leading-relaxed">{children}</div>
+    </div>
+  );
+};
+
+const SourceLink = ({
+  href,
+  title,
+  detail,
+}: {
+  href: string;
+  title: string;
+  detail: string;
+}) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer nofollow"
+    className="group flex items-start gap-3 rounded-lg border border-gray-200 px-4 py-3 transition-colors hover:border-[#a23b2e]/40 hover:bg-[#a23b2e]/5"
+  >
+    <svg
+      className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 transition-colors group-hover:text-[#a23b2e]"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5" />
+      <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5" />
+    </svg>
+    <span>
+      <span className="block text-sm font-medium text-gray-900 group-hover:text-[#a23b2e]">
+        {title}
+      </span>
+      <span className="block text-xs text-gray-500 mt-0.5">{detail}</span>
+    </span>
+  </a>
+);
+
 const steps: StepTypes[] = [
   {
     number: "01",
@@ -38,7 +107,8 @@ const steps: StepTypes[] = [
           We&apos;ll walk through how entity-based pricing works, how our own
           per-item tiered model works, run the numbers side by side at a few
           catalog sizes, and give you a live calculator at the end so you can
-          plug in your own store and see where you land.
+          plug in your own store and see where you land. Every provider figure
+          we quote is linked back to its source at the bottom of the post.
         </p>
       </>
     ),
@@ -67,57 +137,78 @@ const steps: StepTypes[] = [
         </p>
 
         <div className="overflow-x-auto mt-6">
-          <table className="w-full text-sm border border-gray-200 rounded-md overflow-hidden">
-            <thead className="bg-gray-100">
+          <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+            <thead className="bg-gray-900 text-white">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
-                  Provider
-                </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold">Provider</th>
+                <th className="text-left px-4 py-3 font-semibold">
                   Pricing model
                 </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
-                  Typical reported quote, ~6,000 items
+                <th className="text-left px-4 py-3 font-semibold">
+                  Published starting price
                 </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
-                  Notes
-                </th>
+                <th className="text-left px-4 py-3 font-semibold">Notes</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-gray-100">
+              <tr className="border-b border-gray-100 odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">Cart2Cart</td>
                 <td className="px-4 py-3">
                   Entity-based (products, images, options) via their pricing
                   estimator
                 </td>
-                <td className="px-4 py-3">≈ $180&ndash;$210</td>
+                <td className="px-4 py-3">
+                  <span className="inline-flex items-center rounded-full bg-[#a23b2e]/10 text-[#a23b2e] px-2.5 py-0.5 text-xs font-semibold">
+                    from $29
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   Add-ons like order migration or SEO URL preservation are
                   priced separately
                 </td>
               </tr>
-              <tr>
+              <tr className="odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">LitExtension</td>
                 <td className="px-4 py-3">
-                  Tiered, entity-based, starting from $79 and scaling with total
-                  entity count
+                  Tiered, entity-based, scaling with total entity count
                 </td>
-                <td className="px-4 py-3">≈ $199 average</td>
+                <td className="px-4 py-3">
+                  <span className="inline-flex items-center rounded-full bg-[#a23b2e]/10 text-[#a23b2e] px-2.5 py-0.5 text-xs font-semibold">
+                    from $59
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   Optional extras (custom field mapping, manual support)
-                  typically add $30&ndash;$50
+                  typically add to the base quote
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-gray-500 mt-3">
-          Figures based on publicly available pricing pages and commonly
-          reported user quotes as of publication; always confirm current pricing
-          directly with the provider before purchasing, since rates and included
-          services can change.
-        </p>
+        <Callout tone="neutral" label="Where these numbers come from">
+          Starting prices are the figures each provider publishes on their own
+          pricing pages as of this writing&mdash;
+          <a
+            href="https://cart2cart.net/shopping-cart-migration-options/shopify-to-woocommerce-migration/"
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="underline decoration-dotted underline-offset-2 hover:text-[#a23b2e]"
+          >
+            Cart2Cart&apos;s Shopify&rarr;WooCommerce page
+          </a>{" "}
+          and{" "}
+          <a
+            href="https://litextension.com/pricing.html"
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="underline decoration-dotted underline-offset-2 hover:text-[#a23b2e]"
+          >
+            LitExtension&apos;s pricing page
+          </a>
+          . Your actual quote depends on entity count and add-ons, so treat
+          these as floors, not typical totals. Full source list at the end of
+          this post.
+        </Callout>
       </>
     ),
   },
@@ -137,45 +228,49 @@ const steps: StepTypes[] = [
           anything.
         </p>
 
-        <div className="overflow-x-auto mt-6">
-          <table className="w-full text-sm border border-gray-200 rounded-md overflow-hidden">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
-                  Tier
-                </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
-                  Item range
-                </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
-                  Rate per item
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-gray-100">
-                <td className="px-4 py-3 font-medium">Tier 1</td>
-                <td className="px-4 py-3">1&ndash;500</td>
-                <td className="px-4 py-3">$0.10</td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="px-4 py-3 font-medium">Tier 2</td>
-                <td className="px-4 py-3">501&ndash;5,000</td>
-                <td className="px-4 py-3">$0.035</td>
-              </tr>
-              <tr>
-                <td className="px-4 py-3 font-medium">Tier 3</td>
-                <td className="px-4 py-3">5,001+</td>
-                <td className="px-4 py-3">$0.0266</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+          {[
+            {
+              tier: "Tier 1",
+              range: "1–500 items",
+              rate: "$0.10",
+              note: "per item",
+            },
+            {
+              tier: "Tier 2",
+              range: "501–5,000 items",
+              rate: "$0.035",
+              note: "per item",
+            },
+            {
+              tier: "Tier 3",
+              range: "5,001+ items",
+              rate: "$0.0266",
+              note: "per item",
+            },
+          ].map((t) => (
+            <div
+              key={t.tier}
+              className="rounded-xl border border-gray-200 p-5 hover:border-[#a23b2e]/40 hover:shadow-sm transition-all"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                {t.tier}
+              </p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {t.rate}
+                <span className="text-sm font-medium text-gray-400 ml-1">
+                  {t.note}
+                </span>
+              </p>
+              <p className="mt-1 text-sm text-gray-500">{t.range}</p>
+            </div>
+          ))}
         </div>
 
-        <p className="mt-4">
-          The 15% discount code (<strong>SAVE15</strong>) is applied to the
-          pre-discount total across all tiers, not just the first bracket.
-        </p>
+        <Callout tone="accent" label="Discount code">
+          Use <strong>SAVE15</strong> to take 15% off the pre-discount total
+          across all three tiers&mdash;not just the first bracket.
+        </Callout>
       </>
     ),
   },
@@ -194,7 +289,25 @@ const steps: StepTypes[] = [
         <p className="mt-2">
           This reflects our own pricing structure only. For an exact quote from
           Cart2Cart or LitExtension, their respective estimators will give you
-          the most accurate, up-to-date number for their platforms.
+          the most accurate, up-to-date number for their platforms&mdash;
+          <a
+            href="https://cart2cart.net/shopping-cart-migration-options/shopify-to-woocommerce-migration/"
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="underline underline-offset-2 hover:text-[#a23b2e]"
+          >
+            Cart2Cart&apos;s estimator
+          </a>{" "}
+          and{" "}
+          <a
+            href="https://litextension.com/pricing.html"
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="underline underline-offset-2 hover:text-[#a23b2e]"
+          >
+            LitExtension&apos;s calculator
+          </a>{" "}
+          are both linked here for convenience.
         </p>
       </>
     ),
@@ -207,63 +320,83 @@ const steps: StepTypes[] = [
         <p>
           To make the comparison concrete, here&apos;s how the math plays out at
           four catalog sizes. These are worked examples of our own tiered model,
-          shown alongside typical reported ranges for the entity-based providers
-          at similar scale.
+          shown alongside independently reported ranges for automated migration
+          tools at similar scale.
         </p>
 
         <div className="overflow-x-auto mt-6">
-          <table className="w-full text-sm border border-gray-200 rounded-md overflow-hidden">
-            <thead className="bg-gray-100">
+          <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+            <thead className="bg-gray-900 text-white">
               <tr>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold">
                   Catalog size
                 </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold">
                   Our total, pre-discount
                 </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold">
                   Our total, after 15%
                 </th>
-                <th className="text-left px-4 py-3 font-semibold border-b border-gray-200">
-                  Typical entity-based range
+                <th className="text-left px-4 py-3 font-semibold">
+                  Reported tool-based range
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-gray-100">
+              <tr className="border-b border-gray-100 odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">1,000 items</td>
                 <td className="px-4 py-3">$85.00</td>
-                <td className="px-4 py-3">$72.25</td>
-                <td className="px-4 py-3">varies by provider &amp; add-ons</td>
+                <td className="px-4 py-3 font-semibold text-[#a23b2e]">
+                  $72.25
+                </td>
+                <td className="px-4 py-3 text-gray-500">
+                  varies by provider &amp; add-ons
+                </td>
               </tr>
-              <tr className="border-b border-gray-100">
+              <tr className="border-b border-gray-100 odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">
                   5,200 items (mixed catalog)
                 </td>
                 <td className="px-4 py-3">$219.32</td>
-                <td className="px-4 py-3">$186.42</td>
-                <td className="px-4 py-3">≈ $210&ndash;$215 reported</td>
+                <td className="px-4 py-3 font-semibold text-[#a23b2e]">
+                  $186.42
+                </td>
+                <td className="px-4 py-3 text-gray-500">
+                  ≈ $100&ndash;$400 reported
+                </td>
               </tr>
-              <tr className="border-b border-gray-100">
+              <tr className="border-b border-gray-100 odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">6,000 items</td>
                 <td className="px-4 py-3">$234.12</td>
-                <td className="px-4 py-3">$199.00</td>
-                <td className="px-4 py-3">≈ $180&ndash;$210 reported</td>
+                <td className="px-4 py-3 font-semibold text-[#a23b2e]">
+                  $199.00
+                </td>
+                <td className="px-4 py-3 text-gray-500">
+                  ≈ $100&ndash;$400 reported
+                </td>
               </tr>
-              <tr>
+              <tr className="odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">10,000 items</td>
                 <td className="px-4 py-3">$337.62</td>
-                <td className="px-4 py-3">$287.98</td>
-                <td className="px-4 py-3">varies by provider &amp; add-ons</td>
+                <td className="px-4 py-3 font-semibold text-[#a23b2e]">
+                  $287.98
+                </td>
+                <td className="px-4 py-3 text-gray-500">
+                  varies by provider &amp; add-ons
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-gray-500 mt-3">
-          Entity-based ranges depend on exactly which entities and add-ons are
-          included, so treat them as a general reference point rather than a
-          direct line-item comparison.
-        </p>
+        <Callout tone="neutral" label="About the comparison range">
+          The $100&ndash;$400 figure is a commonly cited range for automated
+          Shopify&rarr;WooCommerce migration tools (Cart2Cart and LitExtension
+          among them) at a few hundred to a few thousand entities, per
+          independent cost breakdowns rather than either vendor&apos;s own
+          marketing copy. Exact quotes depend on which entities and add-ons are
+          included, so treat it as a reference point, not a line-item
+          comparison. Sources linked below.
+        </Callout>
       </>
     ),
   },
@@ -276,28 +409,36 @@ const steps: StepTypes[] = [
           Neither pricing structure is objectively right&mdash;they suit
           different priorities:
         </p>
-        <ul className="list-disc pl-6 mt-4 space-y-2">
-          <li>
-            <strong>If you want a guided, full-service quote</strong> that
-            accounts for every entity type individually, an estimator-based
-            provider like Cart2Cart or LitExtension is a solid, proven choice,
-            especially if your catalog has a lot of custom fields, complex
-            variants, or order history you need moved precisely.
-          </li>
-          <li>
-            <strong>
-              If you&apos;d rather calculate your own number upfront
-            </strong>{" "}
-            without submitting store details first, a published per-item tiered
-            rate lets you do that math yourself in a couple of minutes, using
-            the calculator above or your own spreadsheet.
-          </li>
-          <li>
-            <strong>If your priority is white-glove support</strong> through the
-            migration itself, check what each provider includes as standard
-            versus paid add-on&mdash;this often matters more than the headline
-            number.
-          </li>
+        <ul className="mt-4 space-y-3">
+          {[
+            {
+              t: "If you want a guided, full-service quote",
+              d: "that accounts for every entity type individually, an estimator-based provider like Cart2Cart or LitExtension is a solid, proven choice, especially if your catalog has a lot of custom fields, complex variants, or order history you need moved precisely.",
+            },
+            {
+              t: "If you'd rather calculate your own number upfront",
+              d: "without submitting store details first, a published per-item tiered rate lets you do that math yourself in a couple of minutes, using the calculator above or your own spreadsheet.",
+            },
+            {
+              t: "If your priority is white-glove support",
+              d: "through the migration itself, check what each provider includes as standard versus paid add-on\u2014this often matters more than the headline number.",
+            },
+          ].map((item) => (
+            <li key={item.t} className="flex gap-3">
+              <svg
+                className="mt-1 h-4 w-4 shrink-0 text-[#a23b2e]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span>
+                <strong>{item.t}</strong> {item.d}
+              </span>
+            </li>
+          ))}
         </ul>
       </>
     ),
@@ -319,11 +460,11 @@ const steps: StepTypes[] = [
           <li>Image migration, including variant images</li>
           <li>Manual support or white-glove assistance during the move</li>
         </ul>
-        <p className="mt-4">
-          On our end, the only optional extra beyond the per-item rate is
-          premium support, and it&apos;s listed separately at checkout rather
-          than folded into the base total.
-        </p>
+        <Callout tone="success" label="Our policy">
+          The only optional extra beyond the per-item rate is premium support,
+          and it&apos;s listed separately at checkout rather than folded into
+          the base total.
+        </Callout>
       </>
     ),
   },
@@ -332,31 +473,49 @@ const steps: StepTypes[] = [
     title: "Common questions",
     body: (
       <>
-        <p>
-          <strong>Does the 15% discount apply to add-ons?</strong> Yes&mdash; it
-          applies to the total after all selected services are added, not just
-          the base per-item cost.
-        </p>
-        <p className="mt-4">
-          <strong>What if my catalog has more than 10,000 items?</strong> The
-          same tiered rates continue&mdash;everything past 5,000 items is billed
-          at the Tier 3 rate of $0.0266 per item, with no separate negotiation
-          required.
-        </p>
-        <p className="mt-4">
-          <strong>
-            Is this pricing model better than Cart2Cart or LitExtension&apos;s?
-          </strong>{" "}
-          Not inherently&mdash;it&apos;s a different trade-off. Entity-based
-          pricing can account for complexity our flat per-item rate doesn&apos;t
-          separately price (like image-heavy catalogs), while our model trades
-          some of that granularity for a number you can calculate yourself in
-          advance.
-        </p>
-        <p className="mt-4">
-          <strong>Are there any hidden fees on our end?</strong> No. The only
-          optional cost is premium support, shown separately at checkout.
-        </p>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-gray-200 px-5 py-4">
+            <p className="font-medium text-gray-900">
+              Does the 15% discount apply to add-ons?
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              Yes&mdash;it applies to the total after all selected services are
+              added, not just the base per-item cost.
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-200 px-5 py-4">
+            <p className="font-medium text-gray-900">
+              What if my catalog has more than 10,000 items?
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              The same tiered rates continue&mdash;everything past 5,000 items
+              is billed at the Tier 3 rate of $0.0266 per item, with no separate
+              negotiation required.
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-200 px-5 py-4">
+            <p className="font-medium text-gray-900">
+              Is this pricing model better than Cart2Cart or
+              LitExtension&apos;s?
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              Not inherently&mdash;it&apos;s a different trade-off. Entity-based
+              pricing can account for complexity our flat per-item rate
+              doesn&apos;t separately price (like image-heavy catalogs), while
+              our model trades some of that granularity for a number you can
+              calculate yourself in advance.
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-200 px-5 py-4">
+            <p className="font-medium text-gray-900">
+              Are there any hidden fees on our end?
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              No. The only optional cost is premium support, shown separately at
+              checkout.
+            </p>
+          </div>
+        </div>
       </>
     ),
   },
@@ -366,25 +525,34 @@ const steps: StepTypes[] = [
     body: (
       <>
         <p>If you&apos;ve settled on our tool, here&apos;s how to begin:</p>
-        <ol className="list-decimal pl-6 mt-4 space-y-1">
-          <li>
-            Try the free demo&mdash;we&apos;ll migrate up to 50 items at no
-            charge so you can verify data integrity before running a full
-            migration. (please reach us out via{" "}
-            <a className="underline hover:text-[#a23b2e]" href="/contact">
-              contact page
-            </a>
-            )
-          </li>
-          <li>
-            Use the code <strong>SAVE15</strong> on your first full migration to
-            apply the 15% discount automatically.
-          </li>
-          <li>
-            Reach out directly if you have requirements outside the standard
-            catalog structure&mdash;multiple stores, unusual custom fields, or
-            anything else worth a direct conversation.
-          </li>
+        <ol className="mt-4 space-y-3">
+          {[
+            <>
+              Try the free demo&mdash;we&apos;ll migrate up to 50 items at no
+              charge so you can verify data integrity before running a full
+              migration. (please reach us out via{" "}
+              <a className="underline hover:text-[#a23b2e]" href="/contact">
+                contact page
+              </a>
+              )
+            </>,
+            <>
+              Use the code <strong>SAVE15</strong> on your first full migration
+              to apply the 15% discount automatically.
+            </>,
+            <>
+              Reach out directly if you have requirements outside the standard
+              catalog structure&mdash;multiple stores, unusual custom fields, or
+              anything else worth a direct conversation.
+            </>,
+          ].map((content, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#a23b2e] text-xs font-semibold text-white">
+                {i + 1}
+              </span>
+              <span className="pt-0.5">{content}</span>
+            </li>
+          ))}
         </ol>
       </>
     ),
@@ -413,6 +581,51 @@ const steps: StepTypes[] = [
           </Link>
           .
         </p>
+      </>
+    ),
+  },
+  {
+    number: "11",
+    title: "References & sources",
+    body: (
+      <>
+        <p>
+          Every third-party pricing figure in this post links back to the page
+          it came from. Providers update pricing without much notice, so always
+          confirm current numbers directly before you buy.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+          <SourceLink
+            href="https://cart2cart.net/shopping-cart-migration-options/shopify-to-woocommerce-migration/"
+            title="Cart2Cart — Shopify to WooCommerce Migration"
+            detail="Official product page; starting price and entity list"
+          />
+          <SourceLink
+            href="https://www.shopping-cart-migration.com/migration-pricing"
+            title="Cart2Cart — Migration Pricing"
+            detail="Official pricing/estimator landing page"
+          />
+          <SourceLink
+            href="https://litextension.com/pricing.html"
+            title="LitExtension — Pricing"
+            detail="Official pricing page; starting price and calculator"
+          />
+          <SourceLink
+            href="https://litextension.com/shopify-migration/woocommerce-to-shopify-migration.html"
+            title="LitExtension — Migration options & entities"
+            detail="Official product page covering transferable data and add-ons"
+          />
+          <SourceLink
+            href="https://www.codeable.io/blog/shopify-to-wordpress/"
+            title="Codeable — From Shopify to WordPress: cost breakdown"
+            detail="Independent guide citing typical automated-tool cost ranges"
+          />
+          <SourceLink
+            href="https://storeshift.io/blog/shopify-to-woocommerce-migration-cost/"
+            title="StoreShift — Shopify to WooCommerce Migration Cost (2026)"
+            detail="Independent cost comparison across migration tool types"
+          />
+        </div>
       </>
     ),
   },
