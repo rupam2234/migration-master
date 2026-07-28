@@ -66,8 +66,8 @@ export function DashboardShell({
     {
       title: "Settings",
       link: activeProject
-        ? `/dashboard/${activeProject}/import-settings`
-        : "/dashboard/import-settings",
+        ? `/dashboard/${activeProject}/settings`
+        : "/dashboard/settings",
     },
     {
       title: "Log out",

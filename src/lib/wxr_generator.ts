@@ -92,6 +92,50 @@ export interface ShopifyPage {
     updatedAt: string;
 }
 
+export interface ShopifyCustomer {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    createdAt: string;
+    updatedAt?: string;
+    note?: string;
+    tags?: string[];
+    verifiedEmail?: boolean;
+    validEmailAddress?: boolean;
+    numberOfOrders?: string | number;
+    amountSpent?: { amount: string; currencyCode: string };
+    defaultAddress?: {
+        address1?: string;
+        address2?: string;
+        city?: string;
+        company?: string;
+        country?: string;
+        countryCodeV2?: string;
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        province?: string;
+        provinceCode?: string;
+        zip?: string;
+    };
+    addresses?: Array<{
+        address1?: string;
+        address2?: string;
+        city?: string;
+        company?: string;
+        country?: string;
+        countryCodeV2?: string;
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        province?: string;
+        provinceCode?: string;
+        zip?: string;
+    }>;
+}
+
 export interface WXRConfig {
     /** Your WordPress site URL, e.g. "https://mysite.com" */
     siteUrl: string;
@@ -475,6 +519,8 @@ export function generateWXR(
             return generatePagesWXR(data as ShopifyPage[], cfg);
         case "products":
             return generateProductsWXR(data as ShopifyProduct[], cfg);
+        case "customers":
+            return generateCustomersWXR(data as ShopifyCustomer[], cfg);
         default:
             throw new Error(`Unknown WXR resource: ${resource}`);
     }
@@ -516,6 +562,7 @@ const DEFAULT_CHUNK_SIZE: Record<Resurces, number> = {
     articles: 250,
     pages: 250,
     orders: 200,
+    customers: 500,
     single_article: 1,
     products: 50,
 };
@@ -772,6 +819,40 @@ export function generateProductsWXR(
     return (
         wxrHeader(cfg, "Shopify Products Export") +
         blocks.join("\n") +
+        "\n" +
+        wxrFooter()
+    );
+}
+
+export function generateCustomersWXR(
+    customers: ShopifyCustomer[],
+    cfg: WXRConfig
+): string {
+    const authorBlocks: string[] = [];
+
+    for (const customer of customers) {
+        const userId = gidToId(customer.id);
+        const email = customer.email ?? `${customer.id.replace(/\D/g, "")}@example.com`;
+        const username = (customer.email ? customer.email.split("@")[0] : `customer_${userId}`)
+            .toLowerCase()
+            .replace(/[^a-z0-9_.-]/g, "");
+        const firstName = customer.firstName ?? "";
+        const lastName = customer.lastName ?? "";
+        const displayName = `${firstName} ${lastName}`.trim() || username;
+
+        authorBlocks.push(`  <wp:author>
+        <wp:author_id>${userId}</wp:author_id>
+        <wp:author_login>${cdata(username)}</wp:author_login>
+        <wp:author_email>${cdata(email)}</wp:author_email>
+        <wp:author_first_name>${cdata(firstName)}</wp:author_first_name>
+        <wp:author_last_name>${cdata(lastName)}</wp:author_last_name>
+        <wp:author_display_name>${cdata(displayName)}</wp:author_display_name>
+    </wp:author>`);
+    }
+
+    return (
+        wxrHeader(cfg, "Shopify Customers Export") +
+        authorBlocks.join("\n") +
         "\n" +
         wxrFooter()
     );

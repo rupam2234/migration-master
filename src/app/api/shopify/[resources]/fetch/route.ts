@@ -14,8 +14,64 @@ export type Resurces =
   | "orders"
   | "images"
   | "products"
+  | "customers";
 
 const QUERY_MAP: Record<Resurces, string> = {
+  customers: `
+      query GetCustomers($cursor: String) {
+        customers(first: ${PAGE_SIZE}, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          edges {
+            node {
+              id
+              firstName
+              lastName
+              email
+              phone
+              createdAt
+              updatedAt
+              note
+              tags
+              verifiedEmail
+              validEmailAddress
+              numberOfOrders
+              amountSpent {
+                amount
+                currencyCode
+              }
+              defaultAddress {
+                address1
+                address2
+                city
+                company
+                country
+                countryCodeV2
+                firstName
+                lastName
+                phone
+                province
+                provinceCode
+                zip
+              }
+              addresses {
+                address1
+                address2
+                city
+                company
+                country
+                countryCodeV2
+                firstName
+                lastName
+                phone
+                province
+                provinceCode
+                zip
+              }
+            }
+          }
+        }
+      }
+    `,
   pages: `
       query GetPages($cursor: String) {
         pages(first: ${PAGE_SIZE}, after: $cursor) {
