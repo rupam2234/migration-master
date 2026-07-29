@@ -16,6 +16,7 @@ import {
   Database,
   FileCheck,
   ShoppingCart,
+  Users,
 } from "lucide-react";
 import styles from "./style.module.css";
 import { Container, Footer, Header } from "@/components";
@@ -132,6 +133,11 @@ const WHAT_MOVES = [
     icon: Tag,
     title: "Categories",
     body: "Blogs and collections become categories on the new platform, matched by slug so posts file into the right place automatically.",
+  },
+  {
+    icon: Users,
+    title: "Customers",
+    body: "Names, emails, addresses, and order history carried over, so returning customers are recognized from day one.",
   },
 ];
 
