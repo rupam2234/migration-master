@@ -13,6 +13,11 @@ export const meta = {
   description:
     "The four things that actually decide whether your rankings survive a Shopify to WordPress migration, what Migration Master preserves automatically, and what you still have to do yourself.",
   author: "Migration Master Editorial Team",
+  openGraph: {
+    siteName: "Migration Master",
+    images: `${IMG_DIR}/02-four-ranking-levers.svg`,
+  },
+  icons: ["/images/icon.svg"],
 };
 
 const steps: StepTypes[] = [
@@ -29,7 +34,7 @@ const steps: StepTypes[] = [
           at risk.
         </p>
         <p className="mt-4">
-          Industry write-ups on <strong>Shopify-to-WordPress</strong> moves cite
+          Industry write-ups on <strong>Shopify to WordPress</strong> moves cite
           recovery timelines stretching well past a year when redirects and URL
           structure aren&apos;t handled correctly, with some stores losing half
           their organic traffic in the process. That&apos;s not a technicality,
@@ -37,7 +42,7 @@ const steps: StepTypes[] = [
           one that costs you a year of pipeline.
         </p>
         <p className="mt-4">
-          The good news: almost none of that risk comes from the actual data
+          The good news is almost none of that risk comes from the actual data
           transfer. It comes from four specific things either being handled or
           not.
         </p>
@@ -54,21 +59,21 @@ const steps: StepTypes[] = [
         <p>Every migration post-mortem comes back to the same four levers:</p>
         <ul className="list-disc pl-6 mt-4 space-y-1">
           <li>
-            <strong>URL and slug parity</strong>does the new page live at a path
-            Google already recognizes?
+            <strong>URL and slug parity</strong> does the new page live at a
+            path Google already recognizes?
           </li>
           <li>
-            <strong>Imported URL rewriting</strong>—do links inside your posts
+            <strong>Imported URL rewriting</strong> do links inside your posts
             and pages update to the new WordPress URLs instead of continuing to
             point at the old Shopify site?
           </li>
           <li>
-            <strong>Image continuity</strong>do your images keep their alt text
+            <strong>Image continuity</strong> do your images keep their alt text
             and filenames, or do they show up as generic, unindexed files?
           </li>
           <li>
-            <strong>Internal links</strong>do your posts and pages still link to
-            each other correctly after the move?
+            <strong>Internal links</strong> do your posts and pages still link
+            to each other correctly after the move?
           </li>
         </ul>
         <p className="mt-4">
