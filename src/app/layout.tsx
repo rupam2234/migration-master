@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   category: "WordPress",
   openGraph: {
     siteName: "Migration Master",
-    images: "/images/Migration-Master_logo.png",
+    images: "/images/migration-master-opengraph-image.png",
   },
   icons: ["/images/icon.svg"],
 };
