@@ -328,7 +328,7 @@ export default function ExportResources() {
                 <Loader2Icon className="animate-spin" size={19} />
               </span>
             ) : (
-              `Export ${selected.size} Record${selected.size !== 1 ? "s" : ""}`
+              `Generate WP Import (${selected.size} Record${selected.size !== 1 ? "s" : ""})`
             )}
           </button>
         </div>
