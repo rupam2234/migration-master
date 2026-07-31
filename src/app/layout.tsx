@@ -8,6 +8,7 @@ import {
   IBM_Plex_Sans,
   IBM_Plex_Mono,
 } from "next/font/google";
+import Script from "next/script";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -60,6 +61,25 @@ export default function RootLayout({
         lang="en"
         className={`${plex.variable} ${mono.variable} ${barlow.variable}`}
       >
+        <head>
+          <Script
+            id="crisp-chat"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                  window.$crisp=[];
+                  window.CRISP_WEBSITE_ID="0bdf8210-d4d7-46ab-ac91-6e36735e28e5";
+                  (function(){
+                    d=document;
+                    s=d.createElement("script");
+                    s.src="https://client.crisp.chat/l.js";
+                    s.async=1;
+                    d.getElementsByTagName("head")[0].appendChild(s);
+                  })();
+                `,
+            }}
+          />
+        </head>
         <body
           className={`${geistSans.variable} ${styles["mm-root"]}  ${geistMono.variable} antialiased`}
         >
