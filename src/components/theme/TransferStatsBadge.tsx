@@ -86,7 +86,7 @@ export default function TransferStatsBadge() {
           <span className={styles.mmBadgeValue}>
             {transfers.toLocaleString()}
           </span>
-          <span className={styles.mmBadgeLabel}>transfers</span>
+          <span className={styles.mmBadgeLabel}>transfers completed</span>
           {/* <span className={styles.mmBadgeDivider} aria-hidden="true" /> */}{" "}
           <span className={styles.mmBadgeLabel}>accross</span>
           <span className={styles.mmBadgeValue}>

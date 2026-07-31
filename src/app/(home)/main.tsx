@@ -375,7 +375,9 @@ export default function Main() {
               <h2 className={`${styles["mm-display"]} ${styles["mm-h2"]}`}>
                 Built for reliable migrations
               </h2>
-              <TransferStatsBadge />
+              <div className="hidden md:block">
+                <TransferStatsBadge />
+              </div>
             </div>
 
             <p className={styles["mm-section-lede"]}>
