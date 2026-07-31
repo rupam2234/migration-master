@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import styles from "./style.module.css";
+import TransferStatsBadge from "@/components/theme/TransferStatsBadge";
 import { Container, Footer, Header } from "@/components";
 import { calculateTieredPrice, TIERED_PRICING } from "@/lib/pricing/tiered";
 
@@ -374,19 +375,7 @@ export default function Main() {
               <h2 className={`${styles["mm-display"]} ${styles["mm-h2"]}`}>
                 Built for reliable migrations
               </h2>
-              <a
-                href="https://www.producthunt.com/products/migration-master?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-migration-master"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden md:block"
-              >
-                <img
-                  alt="Migration Master - Move your Shopify store to WordPress without the mess | Product Hunt"
-                  width="250"
-                  height="54"
-                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1203425&amp;theme=light&amp;t=1785046874803"
-                />
-              </a>
+              <TransferStatsBadge />
             </div>
 
             <p className={styles["mm-section-lede"]}>

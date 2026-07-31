@@ -206,7 +206,129 @@
 
 .mm-chip svg {
     color: var(--route);
-}
+  }
+
+  .mmBadge {
+      display: inline-flex;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(6px);
+      font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+      font-size: 13px;
+      line-height: 1;
+      color: #1a1a1a;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      /* reserve a fixed footprint so nothing shifts when content swaps */
+      min-width: 220px;
+      min-height: 16px;
+  }
+
+  /* All layers occupy the same grid cell — this is what kills the CLS */
+  .mmBadgeStack {
+      display: grid;
+      width: 100%;
+  }
+
+  .mmBadgeLayer {
+      grid-area: 1 / 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateY(2px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      pointer-events: none;
+  }
+
+  .mmBadgeLayer[data-visible='true'] {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+  }
+
+  .mmBadgeValue {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+  }
+
+  .mmBadgeLabel {
+      color: rgba(0, 0, 0, 0.45);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+  }
+
+  .mmBadgeDivider {
+      width: 1px;
+      height: 12px;
+      background: rgba(0, 0, 0, 0.12);
+      margin: 0 2px;
+  }
+
+  .mmBadgeDot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+  }
+
+  .mmBadgeDot[data-state='on'] {
+      background: #16a34a;
+      animation: mmPulse 2s ease-out infinite;
+  }
+
+  .mmBadgeDot[data-state='off'] {
+      background: rgba(0, 0, 0, 0.25);
+  }
+
+  @keyframes mmPulse {
+      0% {
+          box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4);
+      }
+
+      70% {
+          box-shadow: 0 0 0 6px rgba(22, 163, 74, 0);
+      }
+
+      100% {
+          box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+      }
+  }
+
+  .mmBadgeMuted {
+      color: rgba(0, 0, 0, 0.4);
+  }
+
+  .mmBadgeSkeleton {
+      width: 140px;
+      height: 12px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 25%, rgba(0, 0, 0, 0.12) 50%, rgba(0, 0, 0, 0.06) 75%);
+      background-size: 200% 100%;
+      animation: mmShimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes mmShimmer {
+      0% {
+          background-position: 200% 0;
+      }
+
+      100% {
+          background-position: -200% 0;
+      }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+
+      .mmBadgeDot[data-state='on'],
+      .mmBadgeSkeleton,
+      .mmBadgeLayer {
+          animation: none;
+          transition: none;
+      } }
 
 /* ---------- manifest card (signature element) ---------- */
 .mm-manifest-wrap {
