@@ -39,7 +39,7 @@ const barlow = Barlow_Condensed({
 export const metadata: Metadata = {
   title: "Migration Master",
   description:
-    "A tool to streamline the migration of Shopify pages and posts to WordPress.",
+    "Prepare WordPress ready import files of your products, customers, orders, pages, blogs and media library from shopify store to significantly reduce migration time and configuration required. Avoids broken links and images + preserve SEO.",
   creator: "FlipCraft Devs",
   publisher: "Migration Master",
   category: "WordPress",
