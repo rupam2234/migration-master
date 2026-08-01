@@ -238,15 +238,15 @@ export default function Main() {
               Move from Shopify to WordPress
               <br />
               <span className={styles["mm-accent"]}>
-                Export your products, orders, pages, blogs, and media.
+                Reduce Manual Fixes, Preserve SEO & AI Search Visibility During
+                Migration
               </span>
             </h1>
             <p className={styles["mm-sub"]}>
-              Export your products, orders, blog posts, pages, categories, and
-              media library from shopify store, then package them into
-              WordPress-ready WXR files — the same import format
-              WordPress&apos;s own importer expects. No plugin required, avoids
-              broken links and images.
+              Prepare WordPress ready import files of your products, customers,
+              orders, pages, blogs and media library from shopify store to
+              significantly reduce migration time and configuration required.
+              Avoids broken links and images + preserve SEO.
             </p>
 
             <div className={styles["mm-route-picker"]}>
