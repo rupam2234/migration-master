@@ -188,13 +188,13 @@ const NAV_ITEMS = [
 const TRUST = [
   {
     icon: ShieldCheck,
-    title: "No Shopify credentials required",
+    title: "Secure pipeline to trasnfer data",
     body: "Connect securely with required permissions, generate your export, then disconnect.",
   },
   {
     icon: FileCheck,
-    title: "Preview before you pay",
-    body: "See an itemized manifest showing exactly what will be exported before purchasing anything.",
+    title: "Review Your Data Before Migration",
+    body: "See exactly what will be migrated with a detailed, itemized manifest before you purchase your migration.",
   },
   {
     icon: Database,
@@ -381,9 +381,10 @@ export default function Main() {
             </div>
 
             <p className={styles["mm-section-lede"]}>
-              No proprietary formats, no lock-in, and no guessing what gets
-              exported. Everything is designed to make moving stores
-              predictable.
+              Migration is about preserving the structure of your store and
+              cleaner this foundation is, the easier it becomes to optimize your
+              store on WordPress, maintain search rankings, and preserve
+              long-term growth goals.
             </p>
 
             <div className={styles["mm-grid-4"]}>
@@ -419,8 +420,8 @@ export default function Main() {
               Four steps, in order
             </h2>
             <p className={styles["mm-section-lede"]}>
-              Migrating a store doesn&apos;t need to mean copying content by
-              hand. Here&apos;s the route your content takes.
+              Migrating a store doesn&apos;t need to mean copying content by one
+              by one. Here&apos;s the route your content takes.
             </p>
             <div className={styles["mm-steps"]}>
               {STEPS.map((s) => (
@@ -444,10 +445,11 @@ export default function Main() {
               What actually moves
             </h2>
             <p className={styles["mm-section-lede"]}>
-              Everything below arrives as WordPress-ready WXR files — imported
+              Everything below arrives as WordPress-ready WXR files, imported
               through WordPress&apos;s own importer (not a separate WooCommerce
-              CSV), so products and orders land alongside your pages and blog
-              content in one pass.
+              CSV). The import ready files are designed to connect automatically
+              with WordPress infrastructure so everything feels same as it was
+              on your Shopify store.
             </p>
             <div className={styles["mm-grid-4"]}>
               {WHAT_MOVES.map((item) => {
