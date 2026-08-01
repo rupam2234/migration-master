@@ -33,8 +33,9 @@ export async function POST(req: NextRequest) {
     );
 
     const usesSoFar = Number(usage[0].uses);
-
-    if (usesSoFar >= COUPON_USE_LIMIT_PER_SHOP) {
+    // Special case: SAVE100 coupon limited to 1 use per shop
+    const couponLimit = couponRow.code === "SAVE100" ? 1 : COUPON_USE_LIMIT_PER_SHOP;
+    if (usesSoFar >= couponLimit) {
         return NextResponse.json({
             valid: false,
             discount: 0,
