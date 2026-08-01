@@ -238,7 +238,7 @@ export default function Main() {
               Move from Shopify to WordPress
               <br />
               <span className={styles["mm-accent"]}>
-                Reduce Manual Fixes, Preserve SEO & AI Search Visibility During
+                Reduce Manual Fixes, Preserve SEO & Data Integrity During
                 Migration
               </span>
             </h1>
