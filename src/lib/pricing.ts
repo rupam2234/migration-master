@@ -57,3 +57,14 @@ export function formatExportTotal(
     }).format(convertedTotal);
 }
 
+export function formatCurrencyAmount(
+    amount: number,
+    currency: PaymentCurrency,
+) {
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 2,
+    }).format(amount);
+}
+
