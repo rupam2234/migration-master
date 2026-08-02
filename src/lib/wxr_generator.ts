@@ -58,9 +58,7 @@ export interface ShopifyImage {
     mimeType?: string;
     image?: { url: string; width: number; height: number; altText?: string };
     originalSource?: { fileSize?: number };
-    // Video
     duration?: number;
-    // GenericFile
     url?: string;
     originalFileSize?: number;
 }
@@ -169,6 +167,8 @@ export interface ShopifyCoupon {
     appliesOnEachItem?: boolean;
     productIds?: string[];
     minimumRequirement?: ShopifyCouponMinimumRequirement | null;
+    maximumRequirement?: ShopifyCouponMinimumRequirement | null;
+    usageLimitPerUser?: number | null;
     notes?: string[];
     supported?: boolean;
 }
@@ -529,6 +529,11 @@ function formatCouponProductIds(productIds: string[] | undefined): string {
         .join(",");
 }
 
+function toWPDateOnly(iso: string): string {
+    // WooCommerce's legacy "expiry_date" meta is a plain Y-m-d string.
+    return new Date(iso).toISOString().substring(0, 10);
+}
+
 function couponMetaValue(value: string | number | boolean | null | undefined): string {
     if (value === null || value === undefined) return "";
     if (typeof value === "boolean") return value ? "yes" : "no";
@@ -536,8 +541,8 @@ function couponMetaValue(value: string | number | boolean | null | undefined): s
 }
 
 export function generateCouponsWXR(
-    coupons: ShopifyCoupon[],
-    cfg: WXRConfig
+    coupons: any[], // ShopifyCoupon[] — using any here since interface lives in your original file
+    cfg: { siteUrl: string; defaultAuthor?: string; wxrVersion?: string },
 ): string {
     const author = cfg.defaultAuthor ?? "admin";
 
@@ -567,42 +572,49 @@ export function generateCouponsWXR(
                     : "",
             ].filter(Boolean);
 
+            // ---- CORRECTED: real WooCommerce coupon meta keys (no underscore) ----
             const metaBlocks: [string, string][] = [
-                ["_shopify_gid", coupon.sourceDiscountId],
-                ["_shopify_discount_type", coupon.sourceType],
-                ["_shopify_coupon_code", coupon.code],
-                ["_discount_type", couponType],
-                ["_coupon_amount", String(coupon.couponAmount ?? 0)],
-                ["_individual_use", coupon.supported === false ? "yes" : "no"],
-                ["_usage_limit", couponMetaValue(coupon.usageLimit)],
-                ["_usage_limit_per_user", coupon.appliesOncePerCustomer ? "1" : ""],
-                ["_free_shipping", coupon.discountType === "free_shipping" ? "yes" : "no"],
-                ["_description", coupon.summary ?? coupon.title ?? ""],
+                ["discount_type", couponType],
+                ["coupon_amount", String(coupon.couponAmount ?? 0)],
+                ["individual_use", "no"], // stacking behavior — not a migration-status flag
+                ["usage_limit", couponMetaValue(coupon.usageLimit)],
+                ["usage_limit_per_user", coupon.appliesOncePerCustomer ? "1" : couponMetaValue(coupon.usageLimitPerUser)],
+                ["free_shipping", coupon.discountType === "free_shipping" ? "yes" : "no"],
+                ["exclude_sale_items", "no"],
             ];
 
             if (productIds) {
-                metaBlocks.push(["_product_ids", productIds]);
-            }
-
-            if (coupon.discountType === "fixed_amount" && !coupon.appliesOnEachItem) {
-                metaBlocks.push(["_apply_before_tax", "yes"]);
+                metaBlocks.push(["product_ids", productIds]);
             }
 
             if (coupon.minimumRequirement?.type === "subtotal") {
-                metaBlocks.push(["_minimum_amount", String(coupon.minimumRequirement.value)]);
+                metaBlocks.push(["minimum_amount", String(coupon.minimumRequirement.value)]);
             } else if (coupon.minimumRequirement?.type === "quantity") {
                 notes.push(
                     `Minimum quantity of ${coupon.minimumRequirement.value} could not be mapped directly to a WooCommerce coupon field.`,
                 );
             }
 
-            if (coupon.endsAt) {
-                const expires = Math.floor(new Date(coupon.endsAt).getTime() / 1000);
-                if (Number.isFinite(expires)) {
-                    metaBlocks.push(["_date_expires", String(expires)]);
-                }
+            // ---- NEW: maximum spend support ----
+            if (coupon.maximumRequirement?.type === "subtotal") {
+                metaBlocks.push(["maximum_amount", String(coupon.maximumRequirement.value)]);
+            } else if (coupon.maximumRequirement?.type === "quantity") {
+                notes.push(
+                    `Maximum quantity of ${coupon.maximumRequirement.value} could not be mapped directly to a WooCommerce coupon field.`,
+                );
             }
 
+            // ---- CORRECTED: expiry_date key + Y-m-d format (was _date_expires + timestamp) ----
+            if (coupon.endsAt) {
+                metaBlocks.push(["expiry_date", toWPDateOnly(coupon.endsAt)]);
+            }
+
+            // ---- Custom/internal tracking meta — underscore prefix is correct here,
+            // since these are your own fields, not WooCommerce's. Underscore also
+            // hides them from the default WP custom-fields UI, which is what you want. ----
+            metaBlocks.push(["_shopify_gid", coupon.sourceDiscountId]);
+            metaBlocks.push(["_shopify_discount_type", coupon.sourceType]);
+            metaBlocks.push(["_shopify_coupon_code", coupon.code]);
             if (notes.length > 0) {
                 metaBlocks.push(["_migration_notes", notes.join(" | ")]);
             }
@@ -618,7 +630,7 @@ export function generateCouponsWXR(
 
             return `  <item>
     <title>${escapeXml(coupon.code)}</title>
-    <link>${escapeXml(cfg.siteUrl)}/?post_type=shop_coupon&p=${postId}</link>
+    <link>${escapeXml(cfg.siteUrl)}/?post_type=shop_coupon&amp;p=${postId}</link>
     <pubDate>${pubDate}</pubDate>
     <dc:creator>${cdata(author)}</dc:creator>
     <content:encoded>${cdata(coupon.summary ?? coupon.title ?? "")}</content:encoded>
@@ -640,6 +652,7 @@ ${metaXml}
         .join("\n");
 
     return wxrHeader(cfg, "Shopify Coupons Export") + items + "\n" + wxrFooter();
+
 }
 
 /**
@@ -946,7 +959,7 @@ export function generateProductsWXR(
 
                 blocks.push(`  <item>
                     <title>${escapeXml(`${product.title} - ${variant.title}`)}</title>
-                    <link>${escapeXml(cfg.siteUrl)}/?post_type=product_variation&p=${variationId}</link>
+                    <link>${escapeXml(cfg.siteUrl)}/?post_type=product_variation&amp;p=${variationId}</link>
                     <pubDate>${pubDate}</pubDate>
                     <dc:creator>${cdata(author)}</dc:creator>
                     <content:encoded>${cdata("")}</content:encoded>
