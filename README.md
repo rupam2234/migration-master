@@ -20,6 +20,7 @@ CSV wrangling and broken image links that come with doing it by hand.
   - Pages
   - Blog posts
   - Images
+  - Coupons / discount codes
 - Works in both directions: Shopify → WordPress and WordPress → Shopify
 
 ## Guides

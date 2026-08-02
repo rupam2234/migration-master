@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { razorpay } from "@/lib/razorpay";
-import { getCoupon, envInt, pool } from "@/lib";
-import { calculateExportPrice } from "@/lib/pricing";
+import {
+    getCoupon,
+    envInt,
+    pool,
+    refreshShopifyAccessToken,
+} from "@/lib";
+import {
+    calculateExportPrice,
+    convertExportTotal,
+    fetchLiveUsdToInrRate,
+    type PaymentCurrency,
+} from "@/lib/pricing";
 
-const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 2);
+const API_VERSION = "2026-01";
+const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 3);
 const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
 const COUPON_USE_LIMIT_PER_SHOP = envInt("COUPON_USE_LIMIT_PER_SHOP", 1);
 
@@ -19,6 +30,10 @@ export async function POST(req: NextRequest) {
             { status: 400 },
         );
     }
+
+    const orderCurrency = await resolvePaymentCurrency(req, shopDomain);
+    const usdToInrRate =
+        orderCurrency === "INR" ? await getLiveUsdToInrRate() : 1;
 
     // Re-derive "new" items server-side — never trust that the client only
     // sent unowned items. This mirrors check-export's own logic.
@@ -76,6 +91,7 @@ export async function POST(req: NextRequest) {
     }
 
     const total = subtotal * (1 - discount / 100);
+    const convertedTotal = convertExportTotal(total, orderCurrency, usdToInrRate);
 
     // --- Free-tier check, independent of coupon ---
     const freeUsage = await pool.query(
@@ -98,10 +114,12 @@ export async function POST(req: NextRequest) {
             discount,
             total: 0,
             couponId,
+            currency: orderCurrency,
+            exchangeRate: usdToInrRate,
         });
     }
 
-    let amount = Math.round(total * 100);
+    let amount = Math.round(convertedTotal * 100);
 
     if (amount < 100) {
         amount = 100; // Razorpay minimum — bump up, don't silently waive
@@ -109,7 +127,7 @@ export async function POST(req: NextRequest) {
 
     const order = await razorpay.orders.create({
         amount,
-        currency: "USD",
+        currency: orderCurrency,
         receipt: `export_${Date.now()}`,
         notes: {
             itemCount: String(itemCount),
@@ -117,7 +135,8 @@ export async function POST(req: NextRequest) {
             couponId: couponId ? String(couponId) : "",
             discount: `${discount}%`,
             subtotal: String(subtotal),
-            total: String(total),
+            total: String(convertedTotal),
+            exchangeRate: String(usdToInrRate),
             shopDomain,
             resource,
         },
@@ -129,10 +148,134 @@ export async function POST(req: NextRequest) {
         currency: order.currency,
         subtotal,
         discount,
-        total,
+        total: convertedTotal,
+        exchangeRate: usdToInrRate,
         itemIds: newItemIds,
         shopDomain,
         resource,
         couponId,
     });
+}
+
+async function resolvePaymentCurrency(
+    req: NextRequest,
+    shopDomain: string,
+): Promise<PaymentCurrency> {
+    const detectedCountry =
+        req.headers.get("x-vercel-ip-country")?.toUpperCase() ??
+        req.headers.get("cf-ipcountry")?.toUpperCase() ??
+        null;
+
+    if (detectedCountry === "IN") {
+        return "INR";
+    }
+
+    if (detectedCountry) {
+        return "USD";
+    }
+
+    const connection = await pool.query(
+        `
+            SELECT
+                s."accessToken",
+                s."refreshToken",
+                s."expires",
+                s."refreshTokenExpires",
+                sc.status
+            FROM shopify."Session" s
+            JOIN shopify_connections sc
+              ON sc.shop_domain = s.shop
+            WHERE s.shop = $1
+        `,
+        [shopDomain],
+    );
+
+    const credential = connection[0];
+
+    if (!credential) {
+        return "USD";
+    }
+
+    if (credential.status !== "CONNECTED") {
+        return "USD";
+    }
+
+    let accessToken = credential.accessToken;
+    const expiresAt = new Date(credential.expires).getTime();
+
+    if (Date.now() >= expiresAt) {
+        const refreshed = await refreshShopifyAccessToken(
+            shopDomain,
+            credential.refreshToken,
+        );
+
+        accessToken = refreshed.access_token;
+
+        await pool.query(
+            `
+                UPDATE shopify."Session"
+                SET
+                    "accessToken" = $1,
+                    "refreshToken" = $2,
+                    "expires" = NOW() + ($3 * interval '1 second'),
+                    "refreshTokenExpires" = NOW() + ($4 * interval '1 second')
+                WHERE shop = $5
+            `,
+            [
+                refreshed.access_token,
+                refreshed.refresh_token,
+                refreshed.expires_in,
+                refreshed.refresh_token_expires_in,
+                shopDomain,
+            ],
+        );
+    }
+
+    const response = await fetch(
+        `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Shopify-Access-Token": accessToken,
+            },
+            body: JSON.stringify({
+                query: `
+                    query ShopPaymentContext {
+                        shop {
+                            currencyCode
+                            billingAddress {
+                                countryCode
+                            }
+                        }
+                    }
+                `,
+            }),
+            cache: "no-store",
+        },
+    );
+
+    if (!response.ok) {
+        return "USD";
+    }
+
+    const json = await response.json();
+    const shop = json.data?.shop;
+    const currencyCode = String(shop?.currencyCode ?? "").toUpperCase();
+    const countryCode = String(shop?.billingAddress?.countryCode ?? "").toUpperCase();
+
+    if (currencyCode === "INR" || countryCode === "IN") {
+        return "INR";
+    }
+
+    return "USD";
+}
+
+async function getLiveUsdToInrRate(): Promise<number> {
+    try {
+        return await fetchLiveUsdToInrRate();
+    } catch (error) {
+        console.warn("Falling back to static USD/INR rate", error);
+        return 83;
+    }
 }

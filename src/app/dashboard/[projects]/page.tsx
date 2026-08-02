@@ -10,17 +10,19 @@ import {
   ArrowRightIcon,
   Layers,
   Image,
+  Ticket,
 } from "lucide-react";
 import { useState, type ElementType } from "react";
 import { Resurces } from "@/app/api/shopify/[resources]/fetch/route";
 import { useRouter } from "next/navigation";
 
 const ResourceTypes = {
-  PAGES: "pages",
-  BLOGS: "blogs",
   PRODUCTS: "products",
   ORDERS: "orders",
   CUSTOMERS: "customers",
+  COUPONS: "coupons",
+  PAGES: "pages",
+  BLOGS: "blogs",
   ARTICLES: "articles",
   // SINGLE_ARTICLE: "single_article",
   IMAGES: "images",
@@ -86,6 +88,14 @@ const RESOURCE_CONFIG: Record<ResourceKey, Services> = {
       "Images attached to products or pages are always included at no extra cost.",
     icon: Image,
     accent: "bg-neon-500/10 text-neon-600",
+  },
+  COUPONS: {
+    type: "coupons",
+    label: "Coupons",
+    description:
+      "Shopify discount codes and free-shipping coupons for WooCommerce.",
+    icon: Ticket,
+    accent: "bg-amber-500/10 text-amber-600",
   },
   PRODUCTS: {
     type: "products",

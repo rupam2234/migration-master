@@ -145,6 +145,34 @@ export interface WXRConfig {
     wxrVersion?: string;
 }
 
+export interface ShopifyCouponMinimumRequirement {
+    type: "quantity" | "subtotal";
+    value: number;
+    currencyCode?: string | null;
+}
+
+export interface ShopifyCoupon {
+    id: string;
+    code: string;
+    title: string;
+    summary?: string;
+    sourceDiscountId: string;
+    sourceType: string;
+    startsAt: string;
+    endsAt?: string | null;
+    status?: string | null;
+    usageLimit?: number | null;
+    appliesOncePerCustomer?: boolean;
+    discountType: "percentage" | "fixed_amount" | "free_shipping" | "unsupported";
+    couponAmount: number;
+    discountCurrency?: string | null;
+    appliesOnEachItem?: boolean;
+    productIds?: string[];
+    minimumRequirement?: ShopifyCouponMinimumRequirement | null;
+    notes?: string[];
+    supported?: boolean;
+}
+
 /** Escape characters that are unsafe inside XML text nodes */
 function escapeXml(str: string): string {
     return str
@@ -494,6 +522,126 @@ function phpSerialize(value: unknown): string {
     return `N;`; // null / undefined
 }
 
+function formatCouponProductIds(productIds: string[] | undefined): string {
+    return (productIds ?? [])
+        .map((productId) => gidToId(productId))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .join(",");
+}
+
+function couponMetaValue(value: string | number | boolean | null | undefined): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "boolean") return value ? "yes" : "no";
+    return String(value);
+}
+
+export function generateCouponsWXR(
+    coupons: ShopifyCoupon[],
+    cfg: WXRConfig
+): string {
+    const author = cfg.defaultAuthor ?? "admin";
+
+    const items = coupons
+        .map((coupon) => {
+            const postId = gidToId(`${coupon.sourceDiscountId}:${coupon.code}`);
+            const postDate = toMySQLDate(coupon.startsAt);
+            const pubDate = toRFC2822(coupon.startsAt);
+            const productIds = formatCouponProductIds(coupon.productIds);
+            const hasProductRestrictions = Boolean(productIds);
+            const couponType =
+                coupon.discountType === "percentage"
+                    ? "percent"
+                    : coupon.discountType === "free_shipping"
+                        ? "fixed_cart"
+                        : coupon.discountType === "fixed_amount"
+                            ? coupon.appliesOnEachItem && hasProductRestrictions
+                                ? "fixed_product"
+                                : "fixed_cart"
+                            : "fixed_cart";
+            const isSupported = coupon.supported !== false;
+            const postStatus = isSupported ? "publish" : "draft";
+            const notes = [
+                ...(coupon.notes ?? []),
+                !isSupported
+                    ? "This coupon was imported as a draft because some Shopify rules could not be mapped directly."
+                    : "",
+            ].filter(Boolean);
+
+            const metaBlocks: [string, string][] = [
+                ["_shopify_gid", coupon.sourceDiscountId],
+                ["_shopify_discount_type", coupon.sourceType],
+                ["_shopify_coupon_code", coupon.code],
+                ["_discount_type", couponType],
+                ["_coupon_amount", String(coupon.couponAmount ?? 0)],
+                ["_individual_use", coupon.supported === false ? "yes" : "no"],
+                ["_usage_limit", couponMetaValue(coupon.usageLimit)],
+                ["_usage_limit_per_user", coupon.appliesOncePerCustomer ? "1" : ""],
+                ["_free_shipping", coupon.discountType === "free_shipping" ? "yes" : "no"],
+                ["_description", coupon.summary ?? coupon.title ?? ""],
+            ];
+
+            if (productIds) {
+                metaBlocks.push(["_product_ids", productIds]);
+            }
+
+            if (coupon.discountType === "fixed_amount" && !coupon.appliesOnEachItem) {
+                metaBlocks.push(["_apply_before_tax", "yes"]);
+            }
+
+            if (coupon.minimumRequirement?.type === "subtotal") {
+                metaBlocks.push(["_minimum_amount", String(coupon.minimumRequirement.value)]);
+            } else if (coupon.minimumRequirement?.type === "quantity") {
+                notes.push(
+                    `Minimum quantity of ${coupon.minimumRequirement.value} could not be mapped directly to a WooCommerce coupon field.`,
+                );
+            }
+
+            if (coupon.endsAt) {
+                const expires = Math.floor(new Date(coupon.endsAt).getTime() / 1000);
+                if (Number.isFinite(expires)) {
+                    metaBlocks.push(["_date_expires", String(expires)]);
+                }
+            }
+
+            if (notes.length > 0) {
+                metaBlocks.push(["_migration_notes", notes.join(" | ")]);
+            }
+
+            const metaXml = metaBlocks
+                .map(
+                    ([key, value]) => `    <wp:postmeta>
+      <wp:meta_key>${cdata(key)}</wp:meta_key>
+      <wp:meta_value>${cdata(value)}</wp:meta_value>
+    </wp:postmeta>`,
+                )
+                .join("\n");
+
+            return `  <item>
+    <title>${escapeXml(coupon.code)}</title>
+    <link>${escapeXml(cfg.siteUrl)}/?post_type=shop_coupon&p=${postId}</link>
+    <pubDate>${pubDate}</pubDate>
+    <dc:creator>${cdata(author)}</dc:creator>
+    <content:encoded>${cdata(coupon.summary ?? coupon.title ?? "")}</content:encoded>
+    <excerpt:encoded>${cdata(coupon.summary ?? coupon.title ?? "")}</excerpt:encoded>
+    <wp:post_id>${postId}</wp:post_id>
+    <wp:post_date>${cdata(postDate)}</wp:post_date>
+    <wp:post_date_gmt>${cdata(postDate)}</wp:post_date_gmt>
+    <wp:comment_status>${cdata("closed")}</wp:comment_status>
+    <wp:ping_status>${cdata("closed")}</wp:ping_status>
+    <wp:post_name>${cdata(coupon.code.toLowerCase())}</wp:post_name>
+    <wp:status>${cdata(postStatus)}</wp:status>
+    <wp:post_type>${cdata("shop_coupon")}</wp:post_type>
+    <wp:post_parent>0</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:is_sticky>0</wp:is_sticky>
+${metaXml}
+  </item>`;
+        })
+        .join("\n");
+
+    return wxrHeader(cfg, "Shopify Coupons Export") + items + "\n" + wxrFooter();
+}
+
 /**
  * Single entry point — pass the resource name and its data array,
  * get back a WXR XML string ready to save as a .xml file and feed
@@ -521,6 +669,8 @@ export function generateWXR(
             return generateProductsWXR(data as ShopifyProduct[], cfg);
         case "customers":
             return generateCustomersWXR(data as ShopifyCustomer[], cfg);
+        case "coupons":
+            return generateCouponsWXR(data as ShopifyCoupon[], cfg);
         default:
             throw new Error(`Unknown WXR resource: ${resource}`);
     }
@@ -565,6 +715,7 @@ const DEFAULT_CHUNK_SIZE: Record<Resurces, number> = {
     customers: 500,
     single_article: 1,
     products: 50,
+    coupons: 200,
 };
 
 /**

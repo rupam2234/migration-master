@@ -17,6 +17,7 @@ import {
   FileCheck,
   ShoppingCart,
   Users,
+  User,
 } from "lucide-react";
 import styles from "./style.module.css";
 import TransferStatsBadge from "@/components/theme/TransferStatsBadge";
@@ -26,7 +27,7 @@ import { calculateTieredPrice, TIERED_PRICING } from "@/lib/pricing/tiered";
 const PLATFORMS = [
   { id: "shopify", name: "Shopify" },
   { id: "wordpress", name: "WordPress" },
-  { id: "wix", name: "Wix" },
+  // { id: "wix", name: "Wix" },
 ];
 
 const features = [
@@ -74,6 +75,7 @@ const TIERS = [
 
 const MANIFEST_ROWS = [
   { label: "Products", count: "312", icon: Package },
+  { label: "Customers", count: "210", icon: User },
   { label: "Orders", count: "1,204", icon: ShoppingCart },
   // { label: "Images", count: "4,231", icon: ImageIcon },
   { label: "Articles", count: "86", icon: FileText },
@@ -233,10 +235,13 @@ export default function Main() {
       <Container>
         <section className={`${styles["mm-shell"]} ${styles["mm-hero"]}`}>
           <div>
-            <p className={styles["mm-eyebrow"]}>Shopify migration, itemized</p>
+            <p className={styles["mm-eyebrow"]}>
+              Website & store migration, itemized
+            </p>
             <h1 className={`${styles["mm-display"]} ${styles["mm-h1"]}`}>
-              Move from Shopify to WordPress
-              <br />
+              <span className="flex items-center gap-3">
+                Move from Shopify <ArrowLeftRight size={30} /> WordPress
+              </span>
               <span className={styles["mm-accent"]}>
                 Reduce Manual Fixes, Preserve SEO & Data Integrity During
                 Migration

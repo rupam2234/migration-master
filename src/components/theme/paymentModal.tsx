@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { calculateExportPrice } from "@/app";
+import {
+  calculateExportPrice,
+  formatExportTotal,
+  type PaymentCurrency,
+} from "@/lib/pricing";
 
 type PaymentModalProps = {
   itemIds: string[];
@@ -57,6 +61,13 @@ export function PaymentModal({
           {itemIds.length !== 1 ? "s" : ""} · {price.formatted}
         </p>
 
+        {itemIds.length === 0 && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            No exportable items were found in your current selection. Please
+            select at least one item to continue.
+          </div>
+        )}
+
         <CheckoutWrapper
           price={price}
           itemIds={itemIds}
@@ -94,9 +105,31 @@ function CheckoutWrapper({
   const [loading, setLoading] = useState(false);
   const [finalAmount, setFinalAmount] = useState(price.total);
   const [discount, setDiscount] = useState(0);
+  const [paymentCurrency, setPaymentCurrency] =
+    useState<PaymentCurrency>("USD");
+  const [exchangeRate, setExchangeRate] = useState(83);
   const [couponStatus, setCouponStatus] = useState<
     "idle" | "checking" | "valid" | "invalid" | "used"
   >("idle");
+  const normalizedResource = resource === "IMAGES" ? "MEDIA_LIBRARY" : resource;
+  const minimumCharge = 1;
+  const originalTotal = formatExportTotal(
+    price.total,
+    paymentCurrency,
+    exchangeRate,
+  );
+  const billedAmount =
+    finalAmount > 0 && finalAmount < minimumCharge
+      ? minimumCharge
+      : finalAmount;
+  const displayBilledAmount = formatExportTotal(
+    billedAmount,
+    paymentCurrency,
+    exchangeRate,
+  );
+  const hasMinimumCharge = finalAmount > 0 && finalAmount < minimumCharge;
+  const canStartPayment =
+    itemIds.length > 0 && Boolean(shopDomain) && Boolean(normalizedResource);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -187,7 +220,7 @@ function CheckoutWrapper({
           itemIds,
           coupon: coupon.trim().toUpperCase(),
           shopDomain,
-          resource,
+          resource: normalizedResource,
         }),
       });
 
@@ -198,6 +231,8 @@ function CheckoutWrapper({
       }
 
       if (data.free) {
+        setPaymentCurrency(data.currency === "INR" ? "INR" : "USD");
+        setExchangeRate(Number(data.exchangeRate ?? 83));
         onSuccess({
           razorpay_payment_id: "FREE",
           razorpay_order_id: "FREE",
@@ -214,6 +249,10 @@ function CheckoutWrapper({
 
       setFinalAmount(data.total);
       setDiscount(data.discount);
+      const checkoutCurrency: PaymentCurrency =
+        data.currency === "INR" ? "INR" : "USD";
+      setPaymentCurrency(checkoutCurrency);
+      setExchangeRate(Number(data.exchangeRate ?? 83));
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY,
@@ -221,6 +260,40 @@ function CheckoutWrapper({
         amount: data.amount,
         currency: data.currency,
         order_id: data.orderId,
+
+        config: {
+          display: {
+            blocks:
+              checkoutCurrency === "INR"
+                ? {
+                    preferred_methods: {
+                      name: "Preferred Payment Methods",
+                      instruments: [
+                        {
+                          method: "upi",
+                        },
+                      ],
+                    },
+                  }
+                : {
+                    cards_only: {
+                      name: "Cards",
+                      instruments: [
+                        {
+                          method: "card",
+                        },
+                      ],
+                    },
+                  },
+            sequence:
+              checkoutCurrency === "INR"
+                ? ["block.preferred_methods"]
+                : ["block.cards_only"],
+            preferences: {
+              show_default_blocks: checkoutCurrency === "INR",
+            },
+          },
+        },
 
         name: "Migration Master",
         description: "Shopify to WordPress Export",
@@ -293,7 +366,7 @@ function CheckoutWrapper({
       <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
         <div className="flex justify-between">
           <span>Original</span>
-          <span>{price.formatted}</span>
+          <span>{originalTotal}</span>
         </div>
 
         {discount > 0 && (
@@ -305,8 +378,16 @@ function CheckoutWrapper({
 
         <div className="flex justify-between font-semibold border-t pt-1">
           <span>Total</span>
-          <span>${finalAmount.toFixed(2)}</span>
+          <span>{displayBilledAmount}</span>
         </div>
+
+        {hasMinimumCharge && (
+          <p className="text-xs text-amber-600">
+            Eligible exports under $1.00 are free for your first 3 times. After
+            that, paid exports below $1.00 are rounded up to the $1.00 processor
+            minimum.
+          </p>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -320,7 +401,7 @@ function CheckoutWrapper({
 
         <button
           onClick={startPayment}
-          disabled={loading || couponStatus === "checking"}
+          disabled={loading || couponStatus === "checking" || !canStartPayment}
           className="flex-1 rounded-sm bg-blue-600 px-3 py-1.5 text-sm text-white"
         >
           {loading ? "Creating Order..." : "Complete Order"}

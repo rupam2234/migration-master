@@ -288,6 +288,13 @@ export default function ExportResources() {
                 .map((item: any) => item.id)
                 .filter(Boolean);
 
+              if (itemIds.length === 0) {
+                setNewItemIds([]);
+                setShowPaymentModal(true);
+                setLoading(false);
+                return;
+              }
+
               const res = await fetch("/api/payment/check-export", {
                 method: "POST",
                 headers: {
@@ -513,7 +520,7 @@ export default function ExportResources() {
         itemIds={newItemIds}
         open={showPaymentModal}
         shopDomain={activeProject}
-        resource={key}
+        resource={key === "IMAGES" ? "MEDIA_LIBRARY" : key}
         onSuccess={handleExportSuccess}
         onClose={() => {
           setShowPaymentModal(false);

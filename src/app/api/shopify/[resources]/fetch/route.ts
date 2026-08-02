@@ -1,5 +1,6 @@
 import { getCurrentUser, pool, refreshShopifyAccessToken } from "@/lib";
 import { unstable_cache } from "next/cache";
+import type { ShopifyCoupon } from "@/lib/wxr_generator";
 import { NextRequest, NextResponse } from "next/server";
 
 const API_VERSION = "2026-01";
@@ -14,7 +15,8 @@ export type Resurces =
   | "orders"
   | "images"
   | "products"
-  | "customers";
+  | "customers"
+  | "coupons";
 
 const QUERY_MAP: Record<Resurces, string> = {
   customers: `
@@ -294,8 +296,327 @@ const QUERY_MAP: Record<Resurces, string> = {
         }
       }
     `,
+  coupons: `
+      query GetCoupons($cursor: String) {
+        discountNodes(first: ${PAGE_SIZE}, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          edges {
+            node {
+              id
+              discount {
+                __typename
+                ... on DiscountCodeBasic {
+                  title
+                  summary
+                  status
+                  startsAt
+                  endsAt
+                  usageLimit
+                  appliesOncePerCustomer
+                  codes(first: 50) {
+                    nodes { code }
+                  }
+                  combinesWith {
+                    orderDiscounts
+                    productDiscounts
+                    shippingDiscounts
+                  }
+                  customerGets {
+                    appliesOnOneTimePurchase
+                    appliesOnSubscription
+                    items {
+                      __typename
+                      ... on AllDiscountItems {
+                        allItems
+                      }
+                      ... on DiscountProducts {
+                        products(first: 100) {
+                          nodes {
+                            id
+                            title
+                            handle
+                          }
+                        }
+                        productVariants(first: 100) {
+                          nodes {
+                            id
+                            title
+                            sku
+                            product {
+                              id
+                              title
+                              handle
+                            }
+                          }
+                        }
+                      }
+                      ... on DiscountCollections {
+                        collections(first: 100) {
+                          nodes {
+                            id
+                            title
+                            handle
+                          }
+                        }
+                      }
+                    }
+                    value {
+                      __typename
+                      ... on DiscountPercentage {
+                        percentage
+                      }
+                      ... on DiscountAmount {
+                        amount {
+                          amount
+                          currencyCode
+                        }
+                        appliesOnEachItem
+                      }
+                    }
+                  }
+                  minimumRequirement {
+                    __typename
+                    ... on DiscountMinimumQuantity {
+                      greaterThanOrEqualToQuantity
+                    }
+                    ... on DiscountMinimumSubtotal {
+                      greaterThanOrEqualToSubtotal {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
+                ... on DiscountCodeFreeShipping {
+                  title
+                  summary
+                  status
+                  startsAt
+                  endsAt
+                  usageLimit
+                  appliesOncePerCustomer
+                  codes(first: 50) {
+                    nodes { code }
+                  }
+                  combinesWith {
+                    orderDiscounts
+                    productDiscounts
+                    shippingDiscounts
+                  }
+                  destinationSelection {
+                    __typename
+                  }
+                  minimumRequirement {
+                    __typename
+                    ... on DiscountMinimumQuantity {
+                      greaterThanOrEqualToQuantity
+                    }
+                    ... on DiscountMinimumSubtotal {
+                      greaterThanOrEqualToSubtotal {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
+                ... on DiscountCodeBxgy {
+                  title
+                  summary
+                  status
+                  startsAt
+                  endsAt
+                  usageLimit
+                  appliesOncePerCustomer
+                  usesPerOrderLimit
+                  codes(first: 50) {
+                    nodes { code }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
 
 };
+
+type DiscountNodeRecord = {
+  id: string;
+  discount: {
+    __typename: string;
+    [key: string]: any;
+  };
+};
+
+function normalizeCouponsFromDiscountNode(node: DiscountNodeRecord): ShopifyCoupon[] {
+  const discount = node.discount;
+  const codes = discount.codes?.nodes?.map((entry: { code?: string }) => entry.code?.trim()).filter(Boolean) ?? [];
+
+  if (codes.length === 0) {
+    return [];
+  }
+
+  const base: Pick<
+    ShopifyCoupon,
+    | "sourceDiscountId"
+    | "sourceType"
+    | "title"
+    | "summary"
+    | "startsAt"
+    | "endsAt"
+    | "status"
+    | "usageLimit"
+    | "appliesOncePerCustomer"
+  > = {
+    sourceDiscountId: node.id,
+    sourceType: discount.__typename,
+    title: discount.title ?? "",
+    summary: discount.summary ?? "",
+    startsAt: discount.startsAt ?? "",
+    endsAt: discount.endsAt ?? null,
+    status: discount.status ?? null,
+    usageLimit: discount.usageLimit ?? null,
+    appliesOncePerCustomer: Boolean(discount.appliesOncePerCustomer),
+  };
+
+  if (discount.__typename === "DiscountCodeBasic") {
+    const value = discount.customerGets?.value;
+    const items = discount.customerGets?.items;
+    const minimumRequirement = discount.minimumRequirement;
+
+    const productIds = items?.products?.nodes?.map((product: { id: string }) => product.id) ?? [];
+    const variantProductIds = items?.productVariants?.nodes?.map((variant: { product?: { id?: string } }) => variant.product?.id).filter(Boolean) ?? [];
+    const collectionNames = items?.collections?.nodes?.map((collection: { title?: string }) => collection.title).filter(Boolean) ?? [];
+    const minimumKind =
+      minimumRequirement?.__typename === "DiscountMinimumQuantity"
+        ? "quantity"
+        : minimumRequirement?.__typename === "DiscountMinimumSubtotal"
+          ? "subtotal"
+          : null;
+
+    const discountType =
+      value?.__typename === "DiscountPercentage"
+        ? "percentage"
+        : value?.__typename === "DiscountAmount"
+          ? "fixed_amount"
+          : "unsupported";
+
+    const couponAmount =
+      value?.__typename === "DiscountPercentage"
+        ? Number(value.percentage) * 100
+        : value?.__typename === "DiscountAmount"
+          ? Number(value.amount?.amount ?? 0)
+          : 0;
+
+    const restrictionIds = Array.from(
+      new Set([...productIds, ...variantProductIds]),
+    );
+    const supported =
+      discountType !== "unsupported" &&
+      collectionNames.length === 0 &&
+      minimumKind !== "quantity";
+    const notes: string[] = [];
+
+    if (collectionNames.length > 0) {
+      notes.push(`Shopify collection restrictions were detected: ${collectionNames.join(", ")}`);
+    }
+
+    if (minimumKind === "quantity") {
+      notes.push("Shopify minimum quantity rules cannot be mapped directly to WooCommerce coupons.");
+    }
+
+  return codes.map((code: string) => ({
+    ...base,
+    id: `${node.id}:${code}`,
+    code,
+    discountType,
+    couponAmount,
+      discountCurrency: value?.amount?.currencyCode ?? null,
+      appliesOnEachItem: Boolean(value?.appliesOnEachItem),
+      productIds: restrictionIds,
+      minimumRequirement:
+        minimumKind === "subtotal"
+          ? {
+            type: minimumKind,
+            value: Number(minimumRequirement.greaterThanOrEqualToSubtotal?.amount ?? 0),
+            currencyCode: minimumRequirement.greaterThanOrEqualToSubtotal?.currencyCode ?? null,
+          }
+          : minimumKind === "quantity"
+            ? {
+              type: minimumKind,
+              value: Number(minimumRequirement.greaterThanOrEqualToQuantity ?? 0),
+              currencyCode: null,
+            }
+            : null,
+      notes,
+      supported,
+    }));
+  }
+
+  if (discount.__typename === "DiscountCodeFreeShipping") {
+    const minimumRequirement = discount.minimumRequirement;
+    const minimumKind =
+      minimumRequirement?.__typename === "DiscountMinimumQuantity"
+        ? "quantity"
+        : minimumRequirement?.__typename === "DiscountMinimumSubtotal"
+          ? "subtotal"
+          : null;
+
+    const notes: string[] = [];
+    if (minimumKind === "quantity") {
+      notes.push("Shopify minimum quantity rules cannot be mapped directly to WooCommerce coupons.");
+    }
+    const supported =
+      minimumKind !== "quantity" &&
+      (!discount.destinationSelection?.__typename || discount.destinationSelection.__typename === "DiscountCountryAll");
+
+    if (discount.destinationSelection?.__typename && discount.destinationSelection.__typename !== "DiscountCountryAll") {
+      notes.push("Shipping destination restrictions were detected and will be preserved as a note only.");
+    }
+
+  return codes.map((code: string) => ({
+    ...base,
+    id: `${node.id}:${code}`,
+    code,
+    discountType: "free_shipping",
+      couponAmount: 0,
+      discountCurrency: null,
+      appliesOnEachItem: false,
+      productIds: [],
+      minimumRequirement:
+        minimumKind === "subtotal"
+          ? {
+            type: minimumKind,
+            value: Number(minimumRequirement.greaterThanOrEqualToSubtotal?.amount ?? 0),
+            currencyCode: minimumRequirement.greaterThanOrEqualToSubtotal?.currencyCode ?? null,
+          }
+          : minimumKind === "quantity"
+            ? {
+              type: minimumKind,
+              value: Number(minimumRequirement.greaterThanOrEqualToQuantity ?? 0),
+              currencyCode: null,
+            }
+            : null,
+      notes,
+      supported,
+    }));
+  }
+
+  return codes.map((code: string) => ({
+    ...base,
+    id: `${node.id}:${code}`,
+    code,
+    discountType: "unsupported",
+    couponAmount: 0,
+    discountCurrency: null,
+    appliesOnEachItem: false,
+    productIds: [],
+    minimumRequirement: null,
+    notes: [`Unsupported Shopify coupon type: ${discount.__typename}`],
+    supported: false,
+  }));
+}
 
 type Props = {
   shopDomain: string,
@@ -487,6 +808,20 @@ async function fetchAllResources(
 
       for (const edge of edges) {
         allNodes.push(edge.node);
+      }
+    } else if (resources === "coupons") {
+      json = await shopifyGraphQL({
+        accessToken,
+        query: QUERY_MAP.coupons,
+        shopDomain,
+        variables: { cursor },
+      });
+
+      edges = json.data.discountNodes.edges;
+      pageInfo = json.data.discountNodes.pageInfo;
+
+      for (const edge of edges) {
+        allNodes.push(...normalizeCouponsFromDiscountNode(edge.node));
       }
     } else {
       json = await shopifyGraphQL({
