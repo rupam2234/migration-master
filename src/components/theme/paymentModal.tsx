@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   calculateExportPrice,
-  formatCurrencyAmount,
   formatExportTotal,
   type PaymentCurrency,
 } from "@/lib/pricing";
@@ -123,9 +122,10 @@ function CheckoutWrapper({
     finalAmount > 0 && finalAmount < minimumCharge
       ? minimumCharge
       : finalAmount;
-  const displayBilledAmount = formatCurrencyAmount(
+  const displayBilledAmount = formatExportTotal(
     billedAmount,
     paymentCurrency,
+    exchangeRate,
   );
   const hasMinimumCharge = finalAmount > 0 && finalAmount < minimumCharge;
   const canStartPayment =
