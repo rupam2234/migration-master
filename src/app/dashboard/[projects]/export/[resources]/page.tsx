@@ -251,12 +251,6 @@ export default function ExportResources() {
                 </p>
 
                 <div className="space-y-1">
-                  <p>
-                    <span className="font-medium">Up to 20,000 items</span>
-                    {" — "}
-                    <span className="font-semibold">$0.20/item</span>
-                  </p>
-
                   <p>Covers shopify store&apos;s:</p>
 
                   <ul className="list-disc space-y-0.5 pl-4">
@@ -265,6 +259,8 @@ export default function ExportResources() {
                     <li>Media library</li>
                     <li>Products</li>
                     <li>Orders</li>
+                    <li>Customers</li>
+                    <li>Coupons</li>
                   </ul>
                 </div>
               </div>
