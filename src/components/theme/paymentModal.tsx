@@ -247,7 +247,6 @@ function CheckoutWrapper({
         return;
       }
 
-      setFinalAmount(data.total);
       setDiscount(data.discount);
       const checkoutCurrency: PaymentCurrency =
         data.currency === "INR" ? "INR" : "USD";
