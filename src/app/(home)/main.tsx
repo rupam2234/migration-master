@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   Users,
   User,
+  Ticket,
 } from "lucide-react";
 import styles from "./style.module.css";
 import TransferStatsBadge from "@/components/theme/TransferStatsBadge";
@@ -77,6 +78,7 @@ const MANIFEST_ROWS = [
   { label: "Products", count: "312", icon: Package },
   { label: "Customers", count: "210", icon: User },
   { label: "Orders", count: "1,204", icon: ShoppingCart },
+  { label: "Coupons", count: "10", icon: Ticket },
   // { label: "Images", count: "4,231", icon: ImageIcon },
   { label: "Articles", count: "86", icon: FileText },
   { label: "Pages", count: "12", icon: Layers },
@@ -118,6 +120,16 @@ const WHAT_MOVES = [
     body: "Order history, line items, and customer details, so past sales aren't stranded on Shopify.",
   },
   {
+    icon: Users,
+    title: "Customers",
+    body: "Names, emails, addresses, and order history carried over, so returning customers are recognized from day one.",
+  },
+  {
+    icon: Ticket,
+    title: "Coupons",
+    body: "Coupons codes with their current metadata configured on Shopify store",
+  },
+  {
     icon: ImageIcon,
     title: "Media library",
     body: "Every image, with its original filename and alt text carried over so nothing in your library shows up blank.",
@@ -136,11 +148,6 @@ const WHAT_MOVES = [
     icon: Tag,
     title: "Categories",
     body: "Blogs and collections become categories on the new platform, matched by slug so posts file into the right place automatically.",
-  },
-  {
-    icon: Users,
-    title: "Customers",
-    body: "Names, emails, addresses, and order history carried over, so returning customers are recognized from day one.",
   },
 ];
 
