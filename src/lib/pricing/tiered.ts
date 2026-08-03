@@ -1,9 +1,9 @@
 export const TIERED_PRICING = {
   tier1Limit: 500,
-  tier1Rate: 0.10,
+  tier1Rate: 0.15,
   tier2Limit: 5000,
-  tier2Rate: 0.035,
-  tier3Rate: 0.0266,
+  tier2Rate: 0.05,
+  tier3Rate: 0.025,
 };
 
 /**

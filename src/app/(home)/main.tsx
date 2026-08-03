@@ -239,8 +239,13 @@ export default function Main() {
               Website & store migration, itemized
             </p>
             <h1 className={`${styles["mm-display"]} ${styles["mm-h1"]}`}>
-              <span className="flex items-center gap-3">
-                Move from Shopify <ArrowLeftRight size={30} /> WordPress
+              <span className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
+                <span>Move from</span>
+                <span className="flex items-center gap-2 sm:gap-3">
+                  Shopify{" "}
+                  <ArrowLeftRight className="shrink-0 size-5 sm:size-[30px]" />{" "}
+                  WordPress
+                </span>
               </span>
               <span className={styles["mm-accent"]}>
                 Reduce Manual Fixes, Preserve SEO & Data Integrity During

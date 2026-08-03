@@ -233,19 +233,19 @@ const steps: StepTypes[] = [
             {
               tier: "Tier 1",
               range: "1–500 items",
-              rate: "$0.10",
+              rate: "$0.15",
               note: "per item",
             },
             {
               tier: "Tier 2",
               range: "501–5,000 items",
-              rate: "$0.035",
+              rate: "$0.05",
               note: "per item",
             },
             {
               tier: "Tier 3",
               range: "5,001+ items",
-              rate: "$0.0266",
+              rate: "$0.025",
               note: "per item",
             },
           ].map((t) => (
@@ -345,9 +345,9 @@ const steps: StepTypes[] = [
             <tbody>
               <tr className="border-b border-gray-100 odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">1,000 items</td>
-                <td className="px-4 py-3">$85.00</td>
+                <td className="px-4 py-3">$100.00</td>
                 <td className="px-4 py-3 font-semibold text-[#a23b2e]">
-                  $72.25
+                  $85.00
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   varies by provider &amp; add-ons
@@ -357,9 +357,9 @@ const steps: StepTypes[] = [
                 <td className="px-4 py-3 font-medium">
                   5,200 items (mixed catalog)
                 </td>
-                <td className="px-4 py-3">$219.32</td>
+                <td className="px-4 py-3">$305.00</td>
                 <td className="px-4 py-3 font-semibold text-[#a23b2e]">
-                  $186.42
+                  $259.25
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   ≈ $100&ndash;$400 reported
@@ -367,9 +367,9 @@ const steps: StepTypes[] = [
               </tr>
               <tr className="border-b border-gray-100 odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">6,000 items</td>
-                <td className="px-4 py-3">$234.12</td>
+                <td className="px-4 py-3">$325.00</td>
                 <td className="px-4 py-3 font-semibold text-[#a23b2e]">
-                  $199.00
+                  $276.25
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   ≈ $100&ndash;$400 reported
@@ -377,9 +377,9 @@ const steps: StepTypes[] = [
               </tr>
               <tr className="odd:bg-white even:bg-gray-50">
                 <td className="px-4 py-3 font-medium">10,000 items</td>
-                <td className="px-4 py-3">$337.62</td>
+                <td className="px-4 py-3">$425.00</td>
                 <td className="px-4 py-3 font-semibold text-[#a23b2e]">
-                  $287.98
+                  $361.25
                 </td>
                 <td className="px-4 py-3 text-gray-500">
                   varies by provider &amp; add-ons
@@ -489,7 +489,7 @@ const steps: StepTypes[] = [
             </p>
             <p className="mt-1 text-sm text-gray-600">
               The same tiered rates continue&mdash;everything past 5,000 items
-              is billed at the Tier 3 rate of $0.0266 per item, with no separate
+              is billed at the Tier 3 rate of $0.025 per item, with no separate
               negotiation required.
             </p>
           </div>

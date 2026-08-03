@@ -1,28 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { calculateTieredPrice } from "./tiered";
 
-const TIER1_RATE = 0.1;
-const TIER2_RATE = 0.035;
-const TIER3_RATE = 0.0266;
 const DISCOUNT = 0.15;
-
-function calculateTotal(count: number) {
-  let total = 0;
-  if (count <= 500) {
-    total = count * TIER1_RATE;
-  } else if (count <= 5000) {
-    total = 500 * TIER1_RATE + (count - 500) * TIER2_RATE;
-  } else {
-    total = 500 * TIER1_RATE + 4500 * TIER2_RATE + (count - 5000) * TIER3_RATE;
-  }
-  return total;
-}
 
 export default function PricingCalculator() {
   const [itemCount, setItemCount] = useState<number>(6000);
 
-  const preDiscount = calculateTotal(Math.max(0, itemCount || 0));
+  const preDiscount = calculateTieredPrice(Math.max(0, itemCount || 0));
   const afterDiscount = preDiscount * (1 - DISCOUNT);
 
   return (
