@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, ShoppingBag } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { Container } from "@/components";
 
 export default function SignIn() {
@@ -14,8 +13,6 @@ export default function SignIn() {
     text: string;
     type: "error" | "success";
   } | null>(null);
-  const router = useRouter();
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
@@ -49,8 +46,9 @@ export default function SignIn() {
       setMessage({ text: "Signed in. Redirecting...", type: "success" });
       setLoading(false);
 
-      router.replace("/dashboard");
-      router.refresh();
+      // Use a full navigation so the newly set session cookie is always
+      // included on the first request to /dashboard.
+      window.location.assign("/dashboard");
     } catch {
       setMessage({ text: "Network error. Please try again.", type: "error" });
       setLoading(false);

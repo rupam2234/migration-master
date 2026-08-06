@@ -6,6 +6,7 @@ import * as shopify_vs_wordpress_real_cost_comparison from "./shopify-vs-wordpre
 import * as shopify_to_wordpress_price_comparison from "./shopify-to-wordpress-price-comparison";
 import * as how_long_does_shopify_to_wordpress_migration_take from "./how-long-does-shopify-to-wordpress-migration-take"
 import * as cart2cart_alternative_shopify_to_wordpress from "./cart2cart-alternative-shopify-to-wordpress"
+import * as xxx from "./best-shopify-to-wordpress-migration-tool-for-shopify-plus-merchants"
 
 export const posts = {
     [how_to_migrate_shopify_products_to_wordpress.meta.slug]: how_to_migrate_shopify_products_to_wordpress,
@@ -15,7 +16,8 @@ export const posts = {
     [shopify_vs_wordpress_real_cost_comparison.meta.slug]: shopify_vs_wordpress_real_cost_comparison,
     [shopify_to_wordpress_price_comparison.meta.slug]: shopify_to_wordpress_price_comparison,
     [how_long_does_shopify_to_wordpress_migration_take.meta.slug]: how_long_does_shopify_to_wordpress_migration_take,
-    [cart2cart_alternative_shopify_to_wordpress.meta.slug]: cart2cart_alternative_shopify_to_wordpress
+    [cart2cart_alternative_shopify_to_wordpress.meta.slug]: cart2cart_alternative_shopify_to_wordpress,
+    [xxx.meta.slug]: xxx
 };
 
 export type PostSlug = keyof typeof posts;
