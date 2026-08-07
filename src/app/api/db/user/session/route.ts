@@ -10,7 +10,7 @@ interface Props {
 export async function POST(request: Request) {
 
     const token = randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 min access window
 
     const { email, password }: Props = await request.json();
 
