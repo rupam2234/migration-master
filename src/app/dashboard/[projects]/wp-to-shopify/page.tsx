@@ -33,7 +33,9 @@ export default async function UnderConstruction({
           source_address,
           destination_address,
           source_status,
-          destination_status
+          destination_status,
+          source_credentials,
+          metadata
         FROM migration_connections
         WHERE user_id = $1 AND project_name = $2
         LIMIT 1
@@ -51,8 +53,13 @@ export default async function UnderConstruction({
               {project.project_name}
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              {project.source_platform} → {project.destination_platform}
+              {project.source_platform} {"->"} {project.destination_platform}
             </p>
+            {project.source_status !== "CONNECTED" && (
+              <p className="mt-2 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                Waiting for the WordPress connector to connect
+              </p>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -62,6 +69,14 @@ export default async function UnderConstruction({
             <InfoCard
               label="Destination status"
               value={project.destination_status}
+            />
+            <InfoCard
+              label="Connector site"
+              value={project.source_credentials?.siteUrl || "Not connected yet"}
+            />
+            <InfoCard
+              label="Connector plugin"
+              value={project.source_credentials?.pluginVersion || "Not connected yet"}
             />
           </div>
         </div>
@@ -76,8 +91,7 @@ export default async function UnderConstruction({
         Under Construction
       </h2>
       <p className="max-w-md text-center text-sm">
-        This migration path is currently being built. Check back later for
-        updates!
+        This migration path is currently being built. Check back later for updates!
       </p>
     </div>
   );

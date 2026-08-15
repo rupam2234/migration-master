@@ -5,6 +5,13 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ShoppingBag } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
+type ConnectorInfo = {
+  projectName: string;
+  token: string;
+  appUrl: string;
+  downloadUrl: string;
+};
+
 export default function AddSite() {
   const router = useRouter();
   const [step, setStep] = useState<"select" | "connect" | "preset">("select");
@@ -16,6 +23,10 @@ export default function AddSite() {
   const [sourceIdentifier, setSourceIdentifier] = useState("");
   const [destinationIdentifier, setDestinationIdentifier] = useState("");
   const [isCreatingPreset, setIsCreatingPreset] = useState(false);
+  const [connectorInfo, setConnectorInfo] = useState<ConnectorInfo | null>(
+    null,
+  );
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
 
   function connectShopify() {
     setError("");
@@ -46,6 +57,8 @@ export default function AddSite() {
 
   function openPresetProject() {
     setError("");
+    setConnectorInfo(null);
+    setCopyState("idle");
     setStep("preset");
     setSourcePlatform("WordPress");
     setDestinationPlatform("Shopify");
@@ -55,6 +68,8 @@ export default function AddSite() {
 
   async function createPresetProject() {
     setError("");
+    setConnectorInfo(null);
+    setCopyState("idle");
 
     const trimmedSourceIdentifier = sourceIdentifier.trim();
     const trimmedDestinationIdentifier = destinationIdentifier.trim();
@@ -90,15 +105,133 @@ export default function AddSite() {
         throw new Error(data?.message || "Failed to create migration project");
       }
 
-      router.push(
-        `/dashboard/${encodeURIComponent(projectName)}/wp-to-shopify`,
-      );
+      const data = await res.json().catch(() => null);
+      const connectorToken: string | undefined = data?.connector?.token;
+
+      if (connectorToken) {
+        setConnectorInfo({
+          projectName,
+          token: connectorToken,
+          appUrl: window.location.origin,
+          downloadUrl:
+            data?.connector?.downloadUrl ??
+            `/api/wordpress-connector/download?token=${encodeURIComponent(
+              connectorToken,
+            )}&appUrl=${encodeURIComponent(window.location.origin)}&projectName=${encodeURIComponent(
+              projectName,
+            )}`,
+        });
+        setIsCreatingPreset(false);
+        return;
+      }
+
+      router.push(`/dashboard/${encodeURIComponent(projectName)}/wp-to-shopify`);
       router.refresh();
     } catch (err: any) {
       setError(err?.message || "Failed to create migration project");
     } finally {
       setIsCreatingPreset(false);
     }
+  }
+
+  if (connectorInfo) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-gray-900">
+            Connector Ready
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Download the WordPress source connector, upload it to WordPress,
+            and connect the source site back to this project.
+          </p>
+        </div>
+
+        <div className="rounded-sm border border-emerald-200 bg-emerald-50/60 p-6 shadow-xs space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-sm border border-emerald-200 bg-white p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-500">
+                Project
+              </p>
+              <p className="mt-1 text-sm font-medium text-gray-900 break-all">
+                {connectorInfo.projectName}
+              </p>
+            </div>
+
+            <div className="rounded-sm border border-emerald-200 bg-white p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-500">
+                Download
+              </p>
+              <a
+                href={connectorInfo.downloadUrl}
+                download
+                className="mt-2 inline-flex rounded-sm bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+              >
+                Download plugin zip
+              </a>
+            </div>
+          </div>
+
+          <div className="rounded-sm border border-emerald-200 bg-white p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-500">
+              Connector Token
+            </p>
+            <p className="mt-2 rounded-sm bg-gray-900 px-3 py-2 font-mono text-xs text-white break-all">
+              {connectorInfo.token}
+            </p>
+          </div>
+
+          <div className="space-y-2 text-xs leading-relaxed text-gray-700">
+            <p>
+              1. Download the plugin zip and upload it in WordPress under
+              Plugins {">"} Add New {">"} Upload Plugin.
+            </p>
+            <p>
+              2. In WordPress, open Settings {">"} Migration Master Connector,
+              paste the token, and connect to <code>{connectorInfo.appUrl}</code>.
+            </p>
+            <p>
+              3. Once connected, the app will mark the project as linked in
+              <code>migration_connections</code> and the export endpoints will be available.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            <a
+              href={connectorInfo.downloadUrl}
+              download
+              className="rounded-sm border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+            >
+              Download plugin zip
+            </a>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(connectorInfo.token);
+                setCopyState("copied");
+                window.setTimeout(() => setCopyState("idle"), 1500);
+              }}
+              className="rounded-sm border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+            >
+              {copyState === "copied" ? "Copied token" : "Copy token"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/dashboard/${encodeURIComponent(connectorInfo.projectName)}/wp-to-shopify`,
+                )
+              }
+              className="rounded-sm bg-primary/90 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary"
+            >
+              Open dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

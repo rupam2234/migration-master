@@ -1,4 +1,11 @@
-import { getCurrentUser, pool, WXRConfig } from "@/lib";
+import {
+    buildWordPressConnectorCredentials,
+    generateWordPressConnectorToken,
+    getCurrentUser,
+    isWordPressToShopifyFlow,
+    pool,
+    WXRConfig,
+} from "@/lib";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -22,6 +29,7 @@ export interface MigrationProjectProps {
 
 export async function POST(req: NextRequest) {
     const body = await req.json();
+    const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
 
     const user = await getCurrentUser();
 
@@ -30,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body?.project_name) {
-        return createMigrationProject(body as MigrationProjectProps, user.id);
+        return createMigrationProject(body as MigrationProjectProps, user.id, origin);
     }
 
     const { shopify_domain, wp_settings }: WPSettingsProps = body;
@@ -84,6 +92,7 @@ export async function POST(req: NextRequest) {
 async function createMigrationProject(
     payload: MigrationProjectProps,
     userId: string,
+    origin: string,
 ) {
     const {
         project_name,
@@ -113,6 +122,24 @@ async function createMigrationProject(
             { status: 400 },
         );
     }
+
+    const isWordPressSourceProject = isWordPressToShopifyFlow(
+        source_platform,
+        destination_platform,
+    );
+    const connectorToken = isWordPressSourceProject
+        ? generateWordPressConnectorToken()
+        : null;
+    const connectorCredentials = connectorToken
+        ? {
+              ...(source_credentials ?? {}),
+              ...buildWordPressConnectorCredentials(connectorToken),
+          }
+        : source_credentials;
+    const effectiveSourceStatus =
+        isWordPressSourceProject && source_status === "PENDING"
+            ? "PENDING_CONNECTOR"
+            : source_status;
 
     try {
         const result = await pool.query(
@@ -152,9 +179,9 @@ async function createMigrationProject(
                 destination_platform.trim(),
                 source_address.trim(),
                 destination_address.trim(),
-                source_status,
+                effectiveSourceStatus,
                 destination_status,
-                source_credentials,
+                connectorCredentials,
                 destination_credentials,
                 {
                     project_name: project_name.trim(),
@@ -162,8 +189,14 @@ async function createMigrationProject(
                     destination_platform: destination_platform.trim(),
                     source_address: source_address.trim(),
                     destination_address: destination_address.trim(),
-                    source_status,
+                    source_status: effectiveSourceStatus,
                     destination_status,
+                    connector: connectorToken
+                        ? {
+                              required: true,
+                              state: "PENDING_CONNECTOR",
+                          }
+                        : null,
                     settings,
                 },
             ],
@@ -171,7 +204,25 @@ async function createMigrationProject(
 
         revalidateTag("user-projects");
 
-        return NextResponse.json({ insertMigrationProject: result }, { status: 201 });
+        return NextResponse.json(
+            {
+                insertMigrationProject: result,
+                connector: connectorToken
+                    ? {
+                          token: connectorToken,
+                          downloadUrl: origin
+                              ? `/api/wordpress-connector/download?token=${encodeURIComponent(
+                                    connectorToken,
+                                )}&appUrl=${encodeURIComponent(origin)}&projectName=${encodeURIComponent(
+                                    project_name.trim(),
+                                )}`
+                              : "/wordpress-source-connector.zip",
+                          pluginName: "Migration Master Connector",
+                      }
+                    : null,
+            },
+            { status: 201 },
+        );
     } catch (error: any) {
         console.log(error);
         return NextResponse.json(
