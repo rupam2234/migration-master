@@ -10,8 +10,12 @@ import {
   SelectProject,
 } from "@/components";
 import { useProjectContext } from "@/context";
+import {
+  getDashboardProjectPath,
+  SHOPIFY_TO_WP_PATH,
+} from "@/lib/dashboard-routes";
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 
 export interface DashboardShellProps {
   children: ReactNode;
@@ -28,20 +32,28 @@ export function DashboardShell({
   const { setAllProjects, activeProject } = useProjectContext();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const router = useRouter();
-  const breadcrumbItems = usePathname().split("/").filter(Boolean).slice(0, 3);
+  const pathname = usePathname();
+  const params = useParams<{ projects?: string }>();
+  const routeProject =
+    typeof params.projects === "string"
+      ? decodeURIComponent(params.projects)
+      : activeProject;
+  const breadcrumbItems = pathname.split("/").filter(Boolean).slice(0, 3);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const navItems: NavItems[] = [
     {
       icon: <NavIcons size={15} imagePath="/images/shopify-logo.png" />,
-      link: activeProject ? `/dashboard/${activeProject}` : "/dashboard",
+      link: routeProject
+        ? getDashboardProjectPath(routeProject, SHOPIFY_TO_WP_PATH)
+        : "/dashboard",
       title: "Shopify To WordPress",
     },
     {
       icon: <NavIcons size={15} imagePath="/images/wordpress-logo.png" />,
-      link: activeProject
-        ? `/dashboard/${activeProject}/wp-to-shopify`
+      link: routeProject
+        ? `/dashboard/${encodeURIComponent(routeProject)}/wp-to-shopify`
         : "/dashboard/wp-to-shopify",
       title: "WordPress To Shopify",
     },
@@ -59,14 +71,14 @@ export function DashboardShell({
   const profileNav: { title: string; link?: string; onClick?: () => void }[] = [
     {
       title: "Export Jobs",
-      link: activeProject
-        ? `/dashboard/${activeProject}/export-jobs`
+      link: routeProject
+        ? `/dashboard/${encodeURIComponent(routeProject)}/export-jobs`
         : "/dashboard/export-jobs",
     },
     {
       title: "Settings",
-      link: activeProject
-        ? `/dashboard/${activeProject}/settings`
+      link: routeProject
+        ? `/dashboard/${encodeURIComponent(routeProject)}/settings`
         : "/dashboard/settings",
     },
     {
@@ -143,17 +155,17 @@ export function DashboardShell({
               Dashboard
             </Link>
 
-            {activeProject && (
+            {routeProject && (
               <>
                 <span className="hidden md:block">/</span>
 
                 {/* Mobile */}
                 <Link
-                  href={`/dashboard/${activeProject}`}
+                  href={getDashboardProjectPath(routeProject, SHOPIFY_TO_WP_PATH)}
                   className="hover:underline"
                 >
                   <span className="md:hidden">
-                    {activeProject.split(".myshopify")[0]}
+                    {routeProject.split(".myshopify")[0]}
                   </span>
 
                   {/* Desktop */}
@@ -161,9 +173,11 @@ export function DashboardShell({
                     {breadcrumbItems.slice(1).map((item, index) => (
                       <span key={item}>
                         {index > 0 && " / "}
-                        {item.includes(".myshopify")
+                        {index === 0
                           ? item
-                          : item.replaceAll("-", " ")}
+                          : item.includes(".myshopify")
+                            ? item
+                            : item.replaceAll("-", " ")}
                       </span>
                     ))}
                   </span>

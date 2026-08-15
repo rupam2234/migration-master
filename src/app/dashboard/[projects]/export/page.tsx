@@ -10,7 +10,7 @@ export default function ExportDefault() {
 
   useEffect(() => {
     if (activeProject) {
-      router.replace(`/dashboard/${activeProject}`);
+      router.replace(`/dashboard/${encodeURIComponent(activeProject)}/shopify-to-wp`);
     }
   }, [activeProject, router]);
 

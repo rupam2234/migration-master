@@ -1,20 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  Lock,
-  ShoppingBag,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ShoppingBag } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export default function AddSite() {
-  const [step, setStep] = useState<"select" | "connect">("select");
+  const router = useRouter();
+  const [step, setStep] = useState<"select" | "connect" | "preset">("select");
   const [shopDomain, setShopDomain] = useState("");
   const [error, setError] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
+  const [sourcePlatform, setSourcePlatform] = useState("WordPress");
+  const [destinationPlatform, setDestinationPlatform] = useState("Shopify");
+  const [sourceIdentifier, setSourceIdentifier] = useState("");
+  const [destinationIdentifier, setDestinationIdentifier] = useState("");
+  const [isCreatingPreset, setIsCreatingPreset] = useState(false);
 
   function connectShopify() {
     setError("");
@@ -41,6 +42,63 @@ export default function AddSite() {
 
     setIsConnecting(true);
     window.location.href = `/api/shopify/connect?shop=${encodeURIComponent(shop)}`;
+  }
+
+  function openPresetProject() {
+    setError("");
+    setStep("preset");
+    setSourcePlatform("WordPress");
+    setDestinationPlatform("Shopify");
+    setSourceIdentifier("");
+    setDestinationIdentifier("");
+  }
+
+  async function createPresetProject() {
+    setError("");
+
+    const trimmedSourceIdentifier = sourceIdentifier.trim();
+    const trimmedDestinationIdentifier = destinationIdentifier.trim();
+    const projectName = normalizeHostname(trimmedSourceIdentifier);
+
+    if (!projectName || !trimmedDestinationIdentifier) {
+      setError("Please fill out the source and destination fields.");
+      return;
+    }
+
+    setIsCreatingPreset(true);
+
+    try {
+      const res = await fetch("/api/db/wp-settings/set", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          project_name: projectName,
+          source_platform: sourcePlatform,
+          destination_platform: destinationPlatform,
+          source_address: trimmedSourceIdentifier,
+          destination_address: trimmedDestinationIdentifier,
+          source_status: "PENDING",
+          destination_status: "PENDING",
+          settings: {},
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || "Failed to create migration project");
+      }
+
+      router.push(
+        `/dashboard/${encodeURIComponent(projectName)}/wp-to-shopify`,
+      );
+      router.refresh();
+    } catch (err: any) {
+      setError(err?.message || "Failed to create migration project");
+    } finally {
+      setIsCreatingPreset(false);
+    }
   }
 
   return (
@@ -111,8 +169,11 @@ export default function AddSite() {
               </div>
             </div>
 
-            {/* Card 2: WordPress to Shopify (Disabled) */}
-            <div className="relative flex flex-col justify-between rounded-sm border border-gray-200 bg-gray-50/70 p-6 opacity-60 cursor-not-allowed select-none">
+            {/* Card 2: WordPress to Shopify */}
+            <div
+              onClick={openPresetProject}
+              className="group relative flex flex-col justify-between rounded-sm border border-gray-200 bg-white p-6 shadow-xs transition-all duration-200 hover:border-gray-900 hover:shadow-md cursor-pointer"
+            >
               <div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -137,14 +198,14 @@ export default function AddSite() {
                     </div>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 border border-amber-200">
-                    <Lock className="h-3 w-3 text-amber-500" />
-                    Coming Soon
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                    Available
                   </span>
                 </div>
 
                 <div className="mt-4">
-                  <h3 className="text-base font-semibold text-gray-700">
+                  <h3 className="text-base font-semibold text-gray-900 group-hover:text-black">
                     WordPress to Shopify
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-gray-500">
@@ -154,13 +215,116 @@ export default function AddSite() {
                 </div>
               </div>
 
-              <div className="mt-6 flex items-center justify-between border-t border-gray-200/60 pt-4 text-xs font-medium text-gray-400">
-                <span>Not available yet</span>
-                <ArrowRight className="h-4 w-4" />
+              <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4 text-xs font-medium text-gray-900">
+                <span>Configure connection</span>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </div>
             </div>
           </div>
         </>
+      ) : step === "preset" ? (
+        <div className="max-w-xl space-y-5">
+          <button
+            type="button"
+            onClick={() => setStep("select")}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 transition hover:text-gray-900"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to migration types
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-gray-900 text-white">
+              <ShoppingBag className="h-5 w-5" />
+            </div>
+
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">
+                Create a WordPress to Shopify Project
+              </h2>
+              <p className="text-xs text-gray-500">
+                Save source and destination details into the new migration
+                table.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-sm border border-gray-200 bg-white p-6 shadow-xs space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-sm border border-gray-200 bg-gray-50/80 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                  From
+                </p>
+                <p className="mt-1 text-sm font-medium text-gray-900">
+                  WordPress
+                </p>
+              </div>
+
+              <div className="rounded-sm border border-gray-200 bg-gray-50/80 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                  To
+                </p>
+                <p className="mt-1 text-sm font-medium text-gray-900">
+                  Shopify
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="sourceIdentifier"
+                className="mb-1.5 block text-xs font-medium text-gray-700"
+              >
+                WordPress Site Address
+              </label>
+
+              <input
+                id="sourceIdentifier"
+                type="text"
+                placeholder="https://source-site.com"
+                value={sourceIdentifier}
+                onChange={(e) => setSourceIdentifier(e.target.value)}
+                className="w-full rounded-sm bg-primary/80 px-3 py-2 text-sm text-primary-foreground outline-none transition focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="destinationIdentifier"
+                className="mb-1.5 block text-xs font-medium text-gray-700"
+              >
+                Shopify Store Address
+              </label>
+
+              <input
+                id="destinationIdentifier"
+                type="text"
+                placeholder="my-store.myshopify.com"
+                value={destinationIdentifier}
+                onChange={(e) => setDestinationIdentifier(e.target.value)}
+                className="w-full rounded-sm bg-primary/80 px-3 py-2 text-sm text-primary-foreground outline-none transition focus:border-gray-900 focus:ring-1 focus:ring-gray-900"
+              />
+            </div>
+
+            {error && (
+              <p className="text-xs font-medium text-red-600">{error}</p>
+            )}
+
+            <button
+              type="button"
+              onClick={createPresetProject}
+              disabled={isCreatingPreset}
+              className="flex w-full items-center justify-center gap-2 rounded-sm bg-primary/80 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+            >
+              <span>
+                {isCreatingPreset
+                  ? "Saving project..."
+                  : "Create migration project"}
+              </span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       ) : (
         /* Step 2: Shopify Connection Form */
         <div className="max-w-xl space-y-5">
@@ -247,4 +411,17 @@ export default function AddSite() {
       )}
     </div>
   );
+}
+
+function normalizeHostname(value: string) {
+  if (!value) return "";
+
+  try {
+    const normalized = value.match(/^https?:\/\//i)
+      ? new URL(value)
+      : new URL(`https://${value}`);
+    return normalized.hostname.replace(/\/$/, "");
+  } catch {
+    return value.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  }
 }

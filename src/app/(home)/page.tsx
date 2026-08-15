@@ -1,9 +1,9 @@
 import { Main } from "../index";
 
 export const metadata = {
-  title: "Migration Master | Shopify to WordPress Migration Tool",
+  title: "Migration Master | Website & Store Migration Tool",
   description:
-    "Prepare WordPress ready import files of your products, customers, orders, pages, blogs and media library from shopify store to significantly reduce migration time and configuration required. Avoids broken links and images + preserve SEO.",
+    "Prepare itemized, import-ready files for your products, customers, orders, pages, blogs, and media library. Migrate your website and store between platforms like Shopify and WordPress without broken links, missing images, or lost SEO.",
 };
 
 export default function Home() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useProjectContext } from "@/context";
+import { buildDashboardProjectPath } from "@/lib/dashboard-routes";
 import { ChevronsUpDownIcon } from "lucide-react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -29,13 +30,13 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
     allProjects && allProjects.find((project) => project === activeProject);
 
   useEffect(() => {
-    if (activeProject !== null) return;
-
     const siteToSelect =
       allProjects && allProjects.find((x) => x === param.projects);
 
-    siteToSelect && setActiveProject(siteToSelect);
-  }, [allProjects, param, activeProject, setActiveProject]);
+    if (siteToSelect && siteToSelect !== activeProject) {
+      setActiveProject(siteToSelect);
+    }
+  }, [allProjects, param.projects, activeProject, setActiveProject]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -105,13 +106,7 @@ export function SelectProject({ isCollapsed }: SelectProjectProps) {
     setOpen(false);
 
     const currentProject = param.projects as string;
-
-    const newPath = currentProject
-      ? pathname.replace(
-          `/dashboard/${encodeURIComponent(currentProject)}`,
-          `/dashboard/${encodeURIComponent(title)}`,
-        )
-      : `/dashboard/${encodeURIComponent(title)}`;
+    const newPath = buildDashboardProjectPath(title, pathname, currentProject);
 
     router.push(newPath);
   }

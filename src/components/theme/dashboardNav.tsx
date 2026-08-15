@@ -24,7 +24,9 @@ export function DashboardNavigation({
     <div>
       {navItems &&
         navItems.map((item) => {
-          const isActive = item.link && pathname === item.link;
+          const isActive =
+            !!item.link &&
+            (pathname === item.link || pathname.startsWith(`${item.link}/`));
           return (
             <Link
               href={item.link ?? "#"}
