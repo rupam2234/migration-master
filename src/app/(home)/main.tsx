@@ -33,7 +33,7 @@ const PLATFORMS = [
 
 const features = [
   "Quick API authentication with your store",
-  "Chunked WXR file for default WP import",
+  "Chunked import file for your platform's native importer",
   "Itemized manifest before you pay",
   "You keep the files, re-import when needed",
 ];
@@ -46,7 +46,7 @@ const ROUTES = [
 
 const TIERS = [
   {
-    name: "Tier 1",
+    name: "Tier 1",
     range: "1–500 items",
     rate: TIERED_PRICING.tier1Rate,
     minimum: 1,
@@ -55,7 +55,7 @@ const TIERS = [
     features,
   },
   {
-    name: "Tier 2",
+    name: "Tier 2",
     range: "501–5,000 items",
     rate: TIERED_PRICING.tier2Rate,
     minimum: 501,
@@ -64,7 +64,7 @@ const TIERS = [
     features,
   },
   {
-    name: "Tier 3",
+    name: "Tier 3",
     range: "5,001+ items",
     rate: TIERED_PRICING.tier3Rate,
     minimum: 5001,
@@ -112,12 +112,12 @@ const WHAT_MOVES = [
   {
     icon: Package,
     title: "Products",
-    body: "Titles, descriptions, prices, stock, and images, matched to WooCommerce's product fields on import.",
+    body: "Titles, descriptions, prices, stock, and images, mapped to your destination platform's product fields on import.",
   },
   {
     icon: ShoppingCart,
     title: "Orders",
-    body: "Order history, line items, and customer details, so past sales aren't stranded on Shopify.",
+    body: "Order history, line items, and customer details, so past sales aren't stranded on your old platform.",
   },
   {
     icon: Users,
@@ -127,7 +127,7 @@ const WHAT_MOVES = [
   {
     icon: Ticket,
     title: "Coupons",
-    body: "Coupons codes with their current metadata configured on Shopify store",
+    body: "Coupon codes with their current metadata, carried over from your source store.",
   },
   {
     icon: ImageIcon,
@@ -147,22 +147,22 @@ const WHAT_MOVES = [
   {
     icon: Tag,
     title: "Categories",
-    body: "Blogs and collections become categories on the new platform, matched by slug so posts file into the right place automatically.",
+    body: "Collections and other groupings on your source platform map to categories on the new one, matched by slug so posts file into the right place automatically.",
   },
 ];
 
 const FAQS = [
   {
     q: "How do I migrate my store's content to another platform?",
-    a: "You connect your store, then fetch whichever content types you need — Products, Orders, Pages, Blogs, Articles, or Images — from separate cards on the dashboard. Review the itemized manifest for each, then export. You import the resulting files via WordPress's import tool.",
+    a: "You connect your store, then fetch whichever content types you need — Products, Orders, Pages, Blogs, Articles, or Images — from separate cards on the dashboard. Review the itemized manifest for each, then export. You import the resulting files through your destination platform's native import tool.",
   },
   {
     q: "Will I lose my SEO rankings when I migrate?",
     a: "Migrating content correctly is most of the battle: keeping original page and post slugs, preserving alt text on images, and mapping categories cleanly all help search engines recognize the moved content. You'll still want to set up redirects from old URLs to their new equivalents if the URL structure changes.",
   },
   {
-    q: "What is a WXR file, and why does WordPress need one?",
-    a: "WXR (WordPress eXtended RSS) is the XML format WordPress's built-in importer reads. Rather than copying files by hand, we package your content into WXR files so WordPress can import everything — posts, pages, media, and categories — through its normal import screen.",
+    q: "What file format does my new platform need?",
+    a: "It depends on the destination — for example, WordPress's built-in importer reads a WXR (WordPress eXtended RSS) file. Rather than copying content by hand, we package your export into the format your destination platform's native importer expects, so everything comes in through its normal import screen.",
   },
   {
     q: "Can I migrate just my blog and keep my store where it is?",
@@ -174,15 +174,15 @@ const FAQS = [
   },
   {
     q: "Do you migrate products and orders too?",
-    a: "Yes. Products export with titles, descriptions, prices, stock, and images; orders export with order history, line items, and customer details. Both come through as WordPress-ready WXR files, so they land alongside your pages and blog content in one import.",
+    a: "Yes. Products export with titles, descriptions, prices, stock, and images; orders export with order history, line items, and customer details. Both come through as import-ready files for your destination platform, so they land alongside your pages and blog content in one pass.",
   },
   {
-    q: "Do I import products through WooCommerce's CSV importer?",
-    a: "No — skip the WooCommerce products (CSV) option in WordPress. Use the WordPress importer under Tools → Import instead; it reads the WXR files we generate and handles pages, blogs, products, and orders in the same pass.",
+    q: "Do I need a separate CSV importer for products?",
+    a: "No — for WordPress destinations, skip the WooCommerce products (CSV) option and use the WordPress importer under Tools → Import instead; it reads the files we generate and handles pages, blogs, products, and orders in the same pass. Other destination platforms use their own native importer the same way.",
   },
   {
-    q: "Are more platforms coming?",
-    a: "Shopify to WordPress is live and not the other way around as of now. Other routes — WooCommerce, Wix, and BigCommerce — are in progress. If you need one that isn't live yet, email support and we'll let you know when it ships.",
+    q: "Which platforms are supported?",
+    a: "Shopify to WordPress and WordPress to Shopify are both live. Other routes — Wix, WooCommerce as a source, and BigCommerce — are in progress. If you need one that isn't live yet, email support and we'll let you know when it ships.",
   },
 ];
 
@@ -197,7 +197,7 @@ const NAV_ITEMS = [
 const TRUST = [
   {
     icon: ShieldCheck,
-    title: "Secure pipeline to trasnfer data",
+    title: "Secure pipeline to transfer data",
     body: "Connect securely with required permissions, generate your export, then disconnect.",
   },
   {
@@ -207,8 +207,8 @@ const TRUST = [
   },
   {
     icon: Database,
-    title: "Uses WordPress's native importer",
-    body: "Outputs standard WXR files that import through WordPress without proprietary plugins or lock-in.",
+    title: "Uses your destination platform's native importer",
+    body: "Outputs standard import files — like WXR for WordPress — that import through your new platform without proprietary plugins or lock-in.",
   },
   {
     icon: CheckCircle2,
@@ -229,6 +229,8 @@ export default function Main() {
 
   const isLive = routeIsLive(fromId, toId);
   const estimate = useMemo(() => calculateTieredPrice(itemCount), [itemCount]);
+  const fromName = PLATFORMS.find((p) => p.id === fromId)?.name ?? fromId;
+  const toName = PLATFORMS.find((p) => p.id === toId)?.name ?? toId;
 
   const swapPlatforms = () => {
     setFromId(toId);
@@ -242,30 +244,26 @@ export default function Main() {
       <Container>
         <section className={`${styles["mm-shell"]} ${styles["mm-hero"]}`}>
           <div>
-            <p className={styles["mm-eyebrow"]}>
+            {/* <p className={styles["mm-eyebrow"]}>
               Website & store migration, itemized
-            </p>
+            </p> */}
             <h1 className={`${styles["mm-display"]} ${styles["mm-h1"]}`}>
-              <span className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
-                <span>Move from</span>
-                <span className="flex items-center gap-2 sm:gap-3">
-                  Shopify{" "}
-                  <ArrowLeftRight className="shrink-0 size-5 sm:size-[30px]" />{" "}
-                  WordPress
-                </span>
-              </span>
+              <span>Migrate your website & store, {"  "} </span>
               <span className={styles["mm-accent"]}>
                 Reduce Manual Fixes, Preserve SEO & Data Integrity During
                 Migration
               </span>
             </h1>
             <p className={styles["mm-sub"]}>
-              Prepare WordPress ready import files of your products, customers,
-              orders, pages, blogs and media library from shopify store to
-              significantly reduce migration time and configuration required.
-              Avoids broken links and images + preserve SEO.
+              Pick your platforms below and we'll prepare import-ready files for
+              your products, customers, orders, pages, blogs, and media library,
+              cutting migration time and manual configuration. Avoids broken
+              links and images, and preserves SEO.
             </p>
 
+            <p className={styles["mm-eyebrow"]} style={{ marginBottom: 8 }}>
+              Available migrations
+            </p>
             <div className={styles["mm-route-picker"]}>
               <select
                 className={styles["mm-route-select"]}
@@ -357,12 +355,12 @@ export default function Main() {
                   </span>
                 </div>
                 <div className={styles["mm-route"]}>
-                  <span className={styles["mm-port"]}>Shopify</span>
+                  <span className={styles["mm-port"]}>{fromName}</span>
                   <span
                     className={styles["mm-route-line"]}
                     aria-hidden="true"
                   />
-                  <span className={styles["mm-port"]}>WordPress</span>
+                  <span className={styles["mm-port"]}>{toName}</span>
                 </div>
                 {MANIFEST_ROWS.map((row) => {
                   const Icon = row.icon;
@@ -398,9 +396,9 @@ export default function Main() {
             </div>
 
             <p className={styles["mm-section-lede"]}>
-              Migration is about preserving the structure of your store and
+              Migration is about preserving the structure of your store, and the
               cleaner this foundation is, the easier it becomes to optimize your
-              store on WordPress, maintain search rankings, and preserve
+              store on your new platform, maintain search rankings, and preserve
               long-term growth goals.
             </p>
 
@@ -437,8 +435,8 @@ export default function Main() {
               Four steps, in order
             </h2>
             <p className={styles["mm-section-lede"]}>
-              Migrating a store doesn&apos;t need to mean copying content by one
-              by one. Here&apos;s the route your content takes.
+              Migrating a store doesn&apos;t need to mean copying content one by
+              one. Here&apos;s the route your content takes.
             </p>
             <div className={styles["mm-steps"]}>
               {STEPS.map((s) => (
@@ -462,11 +460,11 @@ export default function Main() {
               What actually moves
             </h2>
             <p className={styles["mm-section-lede"]}>
-              Everything below arrives as WordPress-ready WXR files, imported
-              through WordPress&apos;s own importer (not a separate WooCommerce
-              CSV). The import ready files are designed to connect automatically
-              with WordPress infrastructure so everything feels same as it was
-              on your Shopify store.
+              Everything below arrives as {toName} ready import files, built for{" "}
+              {toName}&apos;s own native importing system. The workflow is
+              designed with no re-entry, manual configuration required in mind.
+              The files are structured to plug straight into your new platform
+              so everything feels the same as it was on {fromName}.
             </p>
             <div className={styles["mm-grid-4"]}>
               {WHAT_MOVES.map((item) => {
@@ -564,10 +562,10 @@ export default function Main() {
                   <span>Tier</span>
                   <span className={styles["mm-mono"]}>
                     {itemCount <= 500
-                      ? "Tier 1 (0‑500)"
+                      ? "Tier 1 (0‑500)"
                       : itemCount <= 5000
-                        ? "Tier 2 (501‑5,000)"
-                        : "Tier 3 (5,001+)"}
+                        ? "Tier 2 (501‑5,000)"
+                        : "Tier 3 (5,001+)"}
                   </span>
                 </div>
                 <div className={styles["mm-receipt-row"]}>
