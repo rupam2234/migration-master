@@ -9,6 +9,7 @@ import {
   IBM_Plex_Mono,
 } from "next/font/google";
 import Script from "next/script";
+import { SITE_URL } from "@/lib/site";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -37,6 +38,7 @@ const barlow = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Migration Master",
   description:
     "Prepare WordPress ready import files of your products, customers, orders, pages, blogs and media library from shopify store to significantly reduce migration time and configuration required. Avoids broken links and images + preserve SEO.",

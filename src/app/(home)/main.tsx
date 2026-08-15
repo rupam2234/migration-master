@@ -255,10 +255,10 @@ export default function Main() {
               </span>
             </h1>
             <p className={styles["mm-sub"]}>
-              Pick your platforms below and we'll prepare import-ready files for
-              your products, customers, orders, pages, blogs, and media library,
-              cutting migration time and manual configuration. Avoids broken
-              links and images, and preserves SEO.
+              Pick your platforms below and we&apos;ll prepare import-ready
+              files for your products, customers, orders, pages, blogs, and
+              media library, cutting migration time and manual configuration.
+              Avoids broken links and images, and preserves SEO.
             </p>
 
             <p className={styles["mm-eyebrow"]} style={{ marginBottom: 8 }}>
