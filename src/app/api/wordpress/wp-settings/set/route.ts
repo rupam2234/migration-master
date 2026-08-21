@@ -41,52 +41,52 @@ export async function POST(req: NextRequest) {
         return createMigrationProject(body as MigrationProjectProps, user.id, origin);
     }
 
-    const { shopify_domain, wp_settings }: WPSettingsProps = body;
-    const { siteUrl, defaultAuthor = "admin", wxrVersion = "1.2" } = wp_settings;
+    // const { shopify_domain, wp_settings }: WPSettingsProps = body;
+    // const { siteUrl, defaultAuthor = "admin", wxrVersion = "1.2" } = wp_settings;
 
-    if (!siteUrl || !shopify_domain) {
-        return NextResponse.json({ message: "Bad request" }, { status: 400 });
-    }
+    // if (!siteUrl || !shopify_domain) {
+    //     return NextResponse.json({ message: "Bad request" }, { status: 400 });
+    // }
 
-    try {
-        const result = await pool.query(
-            `SELECT id from shop_credentials where shop_domain = $1`,
-            [shopify_domain],
-        );
+    // try {
+    //     const result = await pool.query(
+    //         `SELECT id from shop_credentials where shop_domain = $1`,
+    //         [shopify_domain],
+    //     );
 
-        if (!result[0].id) {
-            return NextResponse.json({ message: "Shop not found" }, { status: 404 });
-        }
+    //     if (!result[0].id) {
+    //         return NextResponse.json({ message: "Shop not found" }, { status: 404 });
+    //     }
 
-        const insertWpSettings = await pool.query(
-            `
-            INSERT INTO wp_import_config (
-                shop_id,
-                wp_site_url,
-                default_author,
-                wxr_version
-            )
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (shop_id)
-            DO UPDATE SET
-                wp_site_url = EXCLUDED.wp_site_url,
-                default_author = EXCLUDED.default_author,
-                wxr_version = EXCLUDED.wxr_version
-            RETURNING *;
-            `,
-            [
-                result[0].id,
-                siteUrl,
-                defaultAuthor,
-                wxrVersion,
-            ],
-        );
+    //     const insertWpSettings = await pool.query(
+    //         `
+    //         INSERT INTO wp_import_config (
+    //             shop_id,
+    //             wp_site_url,
+    //             default_author,
+    //             wxr_version
+    //         )
+    //         VALUES ($1, $2, $3, $4)
+    //         ON CONFLICT (shop_id)
+    //         DO UPDATE SET
+    //             wp_site_url = EXCLUDED.wp_site_url,
+    //             default_author = EXCLUDED.default_author,
+    //             wxr_version = EXCLUDED.wxr_version
+    //         RETURNING *;
+    //         `,
+    //         [
+    //             result[0].id,
+    //             siteUrl,
+    //             defaultAuthor,
+    //             wxrVersion,
+    //         ],
+    //     );
 
-        return NextResponse.json({ insertWpSettings }, { status: 201 });
-    } catch (error: any) {
-        console.log(error);
-        return NextResponse.json({ message: "Something went wong" }, { status: 500 });
-    }
+    //     return NextResponse.json({ insertWpSettings }, { status: 201 });
+    // } catch (error: any) {
+    //     console.log(error);
+    //     return NextResponse.json({ message: "Something went wong" }, { status: 500 });
+    // }
 }
 
 async function createMigrationProject(
@@ -127,15 +127,19 @@ async function createMigrationProject(
         source_platform,
         destination_platform,
     );
+
     const connectorToken = isWordPressSourceProject
         ? generateWordPressConnectorToken()
         : null;
+
     const connectorCredentials = connectorToken
         ? {
-              ...(source_credentials ?? {}),
-              ...buildWordPressConnectorCredentials(connectorToken),
-          }
+            ...(source_credentials ?? {}),
+            ...buildWordPressConnectorCredentials(connectorToken),
+            connectorToken,
+        }
         : source_credentials;
+
     const effectiveSourceStatus =
         isWordPressSourceProject && source_status === "PENDING"
             ? "PENDING_CONNECTOR"
@@ -193,9 +197,10 @@ async function createMigrationProject(
                     destination_status,
                     connector: connectorToken
                         ? {
-                              required: true,
-                              state: "PENDING_CONNECTOR",
-                          }
+                            required: true,
+                            state: "PENDING_CONNECTOR",
+                            token: connectorToken,
+                        }
                         : null,
                     settings,
                 },
@@ -209,22 +214,22 @@ async function createMigrationProject(
                 insertMigrationProject: result,
                 connector: connectorToken
                     ? {
-                          token: connectorToken,
-                          downloadUrl: origin
-                              ? `/api/wordpress-connector/download?token=${encodeURIComponent(
-                                    connectorToken,
-                                )}&appUrl=${encodeURIComponent(origin)}&projectName=${encodeURIComponent(
-                                    project_name.trim(),
-                                )}`
-                              : "/wordpress-source-connector.zip",
-                          pluginName: "Migration Master Connector",
-                      }
+                        token: connectorToken,
+                        downloadUrl: origin
+                            ? `/api/wordpress/wordpress-connector/download?token=${encodeURIComponent(
+                                connectorToken,
+                            )}&appUrl=${encodeURIComponent(origin)}&projectName=${encodeURIComponent(
+                                project_name.trim(),
+                            )}`
+                            : "/wordpress-source-connector.zip",
+                        pluginName: "Migration Master Connector",
+                    }
                     : null,
             },
             { status: 201 },
         );
     } catch (error: any) {
-        console.log(error);
+        // console.log(error);
         return NextResponse.json(
             { message: error?.message || "Failed to save migration project" },
             { status: 500 },

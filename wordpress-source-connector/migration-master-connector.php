@@ -78,7 +78,7 @@ function mmc_attempt_connect(array $settings) {
     );
 
     $response = wp_remote_post(
-        trailingslashit($app_url) . 'api/wordpress-connector/connect',
+        trailingslashit($app_url) . 'api/wordpress/wordpress-connector/connect',
         array(
             'timeout' => 20,
             'headers' => array(

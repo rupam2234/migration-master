@@ -8,13 +8,13 @@ import {
   InfoIcon,
   Loader2Icon,
 } from "lucide-react";
-import { ResourceKey } from "@/app";
 import { useProjectContext } from "@/context";
 import { useParams } from "next/navigation";
 import { WPimportProps } from "@/app/api/wordpress/[resources]/import/route";
 import JSZip from "jszip";
 import { PaymentModal } from "@/components/theme/paymentModal";
 import { ItemPreview, ToolTip } from "@/components";
+import { ResourceKey } from "@/lib/sharedResources";
 
 type PaymentData = {
   razorpay_payment_id: string;

@@ -83,7 +83,7 @@ export default function AddSite() {
     setIsCreatingPreset(true);
 
     try {
-      const res = await fetch("/api/db/wp-settings/set", {
+      const res = await fetch("/api/wordpress/wp-settings/set", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,8 +101,7 @@ export default function AddSite() {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.message || "Failed to create migration project");
+        throw new Error("Failed to create migration project");
       }
 
       const data = await res.json().catch(() => null);
@@ -115,7 +114,7 @@ export default function AddSite() {
           appUrl: window.location.origin,
           downloadUrl:
             data?.connector?.downloadUrl ??
-            `/api/wordpress-connector/download?token=${encodeURIComponent(
+            `/api/wordpress/wordpress-connector/download?token=${encodeURIComponent(
               connectorToken,
             )}&appUrl=${encodeURIComponent(window.location.origin)}&projectName=${encodeURIComponent(
               projectName,
@@ -125,7 +124,9 @@ export default function AddSite() {
         return;
       }
 
-      router.push(`/dashboard/${encodeURIComponent(projectName)}/wp-to-shopify`);
+      router.push(
+        `/dashboard/${encodeURIComponent(projectName)}/wp-to-shopify`,
+      );
       router.refresh();
     } catch (err: any) {
       setError(err?.message || "Failed to create migration project");
@@ -142,8 +143,8 @@ export default function AddSite() {
             Connector Ready
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Download the WordPress source connector, upload it to WordPress,
-            and connect the source site back to this project.
+            Download the WordPress source connector, upload it to WordPress, and
+            connect the source site back to this project.
           </p>
         </div>
 
@@ -188,23 +189,17 @@ export default function AddSite() {
             </p>
             <p>
               2. In WordPress, open Settings {">"} Migration Master Connector,
-              paste the token, and connect to <code>{connectorInfo.appUrl}</code>.
+              paste the token, and connect to{" "}
+              <code>{connectorInfo.appUrl}</code>.
             </p>
             <p>
               3. Once connected, the app will mark the project as linked in
-              <code>migration_connections</code> and the export endpoints will be available.
+              <code>migration_connections</code> and the export endpoints will
+              be available.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-2">
-            <a
-              href={connectorInfo.downloadUrl}
-              download
-              className="rounded-sm border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
-            >
-              Download plugin zip
-            </a>
-
             <button
               type="button"
               onClick={async () => {

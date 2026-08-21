@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { pool } from ".";
 import { unstable_cache } from "next/cache";
 
-const REVALIDATE_IN = 24 * 3600; // 24 hours
+const REVALIDATE_IN = 3600; // 60 min / 1 hour
 
 const getUserBySessionToken = unstable_cache(async (token: string) => {
     const result = await pool.query(

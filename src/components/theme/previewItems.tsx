@@ -1,6 +1,6 @@
 "use client";
 
-import { ResourceKey } from "@/app";
+import { ResourceKey } from "@/lib/sharedResources";
 import { ImageIcon, Hash } from "lucide-react";
 
 type Props = {

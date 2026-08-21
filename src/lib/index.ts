@@ -15,3 +15,5 @@ export {
   isWordPressToShopifyFlow,
   normalizePlatformName,
 } from "./wordpress-connector";
+export { isShopifyProject } from "./dashboard-routes"
+export type { ResourceKey } from "./sharedResources";

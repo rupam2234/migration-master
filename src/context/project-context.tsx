@@ -1,8 +1,13 @@
 "use client";
 
-import { ResourceKey } from "@/app";
-import { WXRConfig } from "@/lib";
-import { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import { ResourceKey, WXRConfig } from "@/lib";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useState,
+  useEffect,
+} from "react";
 
 interface ProjectContextValue {
   activeProject: string | null;

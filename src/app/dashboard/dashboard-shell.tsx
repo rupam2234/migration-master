@@ -161,7 +161,10 @@ export function DashboardShell({
 
                 {/* Mobile */}
                 <Link
-                  href={getDashboardProjectPath(routeProject, SHOPIFY_TO_WP_PATH)}
+                  href={getDashboardProjectPath(
+                    routeProject,
+                    SHOPIFY_TO_WP_PATH,
+                  )}
                   className="hover:underline"
                 >
                   <span className="md:hidden">

@@ -40,6 +40,12 @@ export function buildDashboardProjectPath(
   return basePath;
 }
 
-export function isShopifyProject(project?: string | null) {
-  return Boolean(project?.toLowerCase().includes(".myshopify.com"));
+export function isShopifyProject(project: string | null) {
+  if (!project) return false;
+
+  if (project.includes("myshopify")) {
+    return true;
+  } else {
+    false;
+  }
 }

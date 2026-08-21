@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Shopify to WordPress",
+  title: "Shopify to WordPress | Migration Master",
 };
 
 export default function ShopifyToWpLayout({
