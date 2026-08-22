@@ -25,7 +25,7 @@ export default async function DashboardLayout({
     redirect("/auth/sign-in");
   }
 
-  const { name, id, email } = user;
+  const { id, name, email } = user;
   const userData = {
     name,
     id,

@@ -1,4 +1,4 @@
-import { pool, verifyPassword } from "@/lib";
+import { getRedisClient, pool, verifyPassword } from "@/lib";
 import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
 
@@ -9,7 +9,9 @@ interface Props {
 
 export async function POST(request: Request) {
 
-    const token = randomBytes(32).toString("hex");
+    const redisClient = await getRedisClient();
+
+    const sessionId = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 min access window
 
     const { email, password }: Props = await request.json();
@@ -30,12 +32,15 @@ export async function POST(request: Request) {
             return Response.json({ message: "Invalid email or password" }, { status: 401 });
         }
 
-        await pool.query(
-            `INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)`,
-            [token, user.id, expiresAt]
-        );
+        // await pool.query(
+        //     `INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)`,
+        //     [sessionId, user.id, expiresAt]
+        // );
 
-        cookies().set("session", token, {
+        // we store in redis instead
+        await redisClient.set(`session:${sessionId}`, JSON.stringify({ userId: user.id }), { EX: 60 * 60 })
+
+        cookies().set("session", sessionId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",

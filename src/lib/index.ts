@@ -17,3 +17,4 @@ export {
 } from "./wordpress-connector";
 export { isShopifyProject } from "./dashboard-routes"
 export type { ResourceKey } from "./sharedResources";
+export { getRedisClient } from "./redis"

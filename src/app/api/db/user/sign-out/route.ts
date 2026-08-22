@@ -1,20 +1,31 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { pool } from "@/lib";
-import { revalidateTag } from "next/cache";
+import { getRedisClient } from "@/lib";
 
 export async function POST() {
-    try {
-        const token = cookies().get("session")?.value;
 
-        if (token) {
-            await pool.query(
-                `DELETE FROM sessions WHERE id = $1`,
-                [token]
+    const redisClient = await getRedisClient();
+
+    try {
+        const sessionId = cookies().get("session")?.value;
+
+        if (!sessionId) {
+            return NextResponse.json(
+                { message: "Already signed out" },
+                { status: 200 }
             );
         }
 
-        revalidateTag(`session:${token}`); // clear cache configured during session
+        await redisClient.del(`session:${sessionId}`)
+
+        // if (sessionId) {
+        //     await pool.query(
+        //         `DELETE FROM sessions WHERE id = $1`,
+        //         [sessionId]
+        //     );
+        // }
+
+        // revalidateTag(`session:${sessionId}`); // clear cache configured during session
 
         const response = NextResponse.json(
             { message: "Signed out" },
