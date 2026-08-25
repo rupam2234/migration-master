@@ -1,15 +1,30 @@
 "use client";
 
 import { useProjectContext } from "@/context";
+import {
+  MMC_RESOURCES,
+  Status,
+  Tags,
+  WOO_RESOURCES,
+  WordPressResource,
+  WordPressService,
+} from "@/lib/sharedResources";
 import { isShopifyProject } from "@/lib/dashboard-routes";
-import { Loader2Icon, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
-
-type Tags = "Check Status" | "Connected" | "Not Connected" | "Checking...";
-
-type Status = {
-  color: string;
-};
+import {
+  ArrowRightIcon,
+  FileTextIcon,
+  ImageIcon,
+  Loader2Icon,
+  NewspaperIcon,
+  ShoppingCartIcon,
+  TagsIcon,
+  Ticket,
+  TriangleAlert,
+  UsersIcon,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ElementType, useEffect, useState } from "react";
+import { cachedData, cleanExpiredCache } from "@/lib/cache";
 
 const wpConnection: Record<Tags, Status> = {
   "Check Status": {
@@ -26,15 +41,86 @@ const wpConnection: Record<Tags, Status> = {
   },
 };
 
+const WORDPRESS_RESOURCE_CONFIG: Record<WordPressResource, WordPressService> = {
+  posts: {
+    type: "posts",
+    label: "Posts",
+    description: "Blog posts published on your WordPress site",
+    icon: NewspaperIcon,
+    accent: "bg-purple-500/10 text-purple-600",
+  },
+
+  pages: {
+    type: "pages",
+    label: "Pages",
+    description: "Static pages on your WordPress site",
+    icon: FileTextIcon,
+    accent: "bg-blue-500/10 text-blue-600",
+  },
+
+  media: {
+    type: "media",
+    label: "Media",
+    description: "Images and other media files from your WordPress site",
+    icon: ImageIcon,
+    accent: "bg-orange-500/10 text-orange-600",
+  },
+
+  categories: {
+    type: "categories",
+    label: "Categories & Tags",
+    description: "Categories, tags, and other taxonomy terms",
+    icon: TagsIcon,
+    accent: "bg-teal-500/10 text-teal-600",
+  },
+
+  products: {
+    type: "products",
+    label: "Products",
+    description: "Export your WooCommerce product catalog",
+    icon: ShoppingCartIcon,
+    accent: "bg-pink-500/10 text-pink-600",
+  },
+
+  orders: {
+    type: "orders",
+    label: "Orders",
+    description: "Customer orders placed through WooCommerce",
+    icon: ShoppingCartIcon,
+    accent: "bg-green-500/10 text-green-600",
+  },
+
+  customers: {
+    type: "customers",
+    label: "Customers",
+    description: "Export WooCommerce customer profiles and addresses",
+    icon: UsersIcon,
+    accent: "bg-teal-500/10 text-teal-600",
+  },
+
+  coupons: {
+    type: "coupons",
+    label: "Coupons",
+    description: "WooCommerce discount and coupon codes",
+    icon: Ticket,
+    accent: "bg-amber-500/10 text-amber-600",
+  },
+};
+
 export default function WpToShopifyDashboard() {
-  const { activeProject } = useProjectContext();
+  const { activeProject, wordPressData, setWordPressData } =
+    useProjectContext();
   const isSuitableProject = !isShopifyProject(activeProject);
   const [wpConnected, setWpConnection] =
     useState<keyof typeof wpConnection>("Check Status");
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    if (loading || !activeProject) return;
+    cleanExpiredCache({ prefix: "wp-cache:", session_Storage: true });
+  }, []);
+
+  useEffect(() => {
+    if (loading || !activeProject || !isSuitableProject) return;
     setWpConnection("Checking...");
     setLoading(true);
 
@@ -125,6 +211,50 @@ export default function WpToShopifyDashboard() {
     );
   }
 
+  async function fetchResource(resource: WordPressResource) {
+    if (!activeProject) return false;
+
+    async function fetchFromApi(project: string, res: WordPressResource) {
+      const response = await fetch(`/api/wordpress/${res}/fetch`, {
+        headers: {
+          "x-projectName": project,
+          asset: res,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${res}`);
+      }
+
+      return response.json() as Promise<any[]>;
+    }
+
+    try {
+      const { response: items } = await cachedData<
+        any[],
+        [string, WordPressResource]
+      >({
+        key: `wp-cache:${activeProject}:${resource}`,
+        fn: fetchFromApi,
+        args: [activeProject, resource],
+        ttl: 10 * 60 * 1000,
+        session_Storage: true,
+        useCache: true,
+        useCrypto: resource === "customers" || resource === "orders",
+      });
+
+      setWordPressData((prev) => ({
+        ...prev,
+        [resource]: items,
+      }));
+
+      return false;
+    } catch (error) {
+      console.error("Error fetching data", error);
+      return false;
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center md:justify-between">
@@ -138,7 +268,8 @@ export default function WpToShopifyDashboard() {
             import ready files.
           </p>
         </div>
-        <div className="flex items-center gap-2.5 text-sm text-primary/60">
+        <div className="flex items-center gap-2 text-sm text-primary/60">
+          <span>WordPress Connection: </span>
           <span className="relative flex h-1.5 w-1.5 shrink-0">
             {wpConnected === "Connected" && (
               <span
@@ -167,16 +298,121 @@ export default function WpToShopifyDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* {RESOURCE_KEYS.map((assetType) => {
-          // const {
-          //   label,
-          //   description,
-          //   icon: Icon,
-          //   accent,
-          // } = RESOURCE_CONFIG[assetType]; */}
+        {[...MMC_RESOURCES, ...WOO_RESOURCES].map((assetType) => {
+          const type = assetType.toLocaleLowerCase() as WordPressResource;
 
-        {/* return <></>;
-        })} */}
+          const {
+            label,
+            description,
+            icon: Icon,
+            accent,
+          } = WORDPRESS_RESOURCE_CONFIG[type];
+
+          return (
+            <ResourceCard
+              key={assetType}
+              accent={accent}
+              icon={Icon}
+              activeProject={activeProject}
+              type={assetType}
+              label={label}
+              description={description}
+              count={(wordPressData[assetType] as any[]).length}
+              fetchResourceTrigger={async () => await fetchResource(assetType)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ResourceCard({
+  accent,
+  icon: Icon,
+  activeProject,
+  type,
+  description,
+  label,
+  count,
+  fetchResourceTrigger,
+}: {
+  accent: string;
+  icon: ElementType;
+  activeProject: string;
+  type: WordPressResource;
+  description: string;
+  label: string;
+  count: number;
+  fetchResourceTrigger: () => Promise<boolean>;
+}) {
+  const router = useRouter();
+  const [assetLoading, setAssetLoading] = useState(false);
+
+  return (
+    <div className="group relative flex flex-col gap-4 rounded-xl border border-primary/10 bg-background p-5 shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
+      <div className="flex items-start justify-between">
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-lg ${accent}`}
+        >
+          <Icon size={20} />
+        </div>
+
+        {assetLoading && (
+          <Loader2Icon size={16} className="animate-spin text-primary/40" />
+        )}
+
+        {!assetLoading && count > 0 && (
+          <span
+            className="cursor-pointer text-xs font-semibold text-blue-500 hover:underline"
+            onClick={() =>
+              router.push(
+                `/dashboard/${encodeURIComponent(activeProject)}/export/${
+                  WORDPRESS_RESOURCE_CONFIG[type].type
+                }`,
+              )
+            }
+          >
+            Export
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-medium">{label}</h3>
+        <p className="text-xs leading-relaxed text-primary/50">{description}</p>
+      </div>
+
+      <div className="mt-auto flex items-center justify-between pt-2">
+        <span className="text-xs font-medium text-primary/70">
+          {count} item{count === 1 ? "" : "s"} loaded
+        </span>
+
+        <button
+          type="button"
+          onClick={async () => {
+            setAssetLoading(true);
+            const bool = await fetchResourceTrigger();
+
+            if (!bool) {
+              setAssetLoading(false);
+            }
+          }}
+          disabled={assetLoading}
+          className="inline-flex items-center gap-1 rounded-md border border-primary/10 bg-primary/5 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {assetLoading ? (
+            "Loading..."
+          ) : (
+            <>
+              Fetch
+              <ArrowRightIcon
+                size={12}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

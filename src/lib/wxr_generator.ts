@@ -1,5 +1,4 @@
-import { Resurces } from "@/app/api/shopify/[resources]/fetch/route";
-
+import { ShopifyResources } from ".";
 
 export interface ShopifyProductImage {
     url: string;
@@ -665,7 +664,7 @@ ${metaXml}
  * fs.writeFileSync("images.xml", xml);
  */
 export function generateWXR(
-    resource: Resurces,
+    resource: ShopifyResources,
     data: any[],
     cfg: WXRConfig
 ): string {
@@ -719,7 +718,7 @@ export interface WXRChunk {
  * Override per-call with the chunkSize argument if your host allows
  * more (or needs less).
  */
-const DEFAULT_CHUNK_SIZE: Record<Resurces, number> = {
+const DEFAULT_CHUNK_SIZE: Record<ShopifyResources, number> = {
     images: 75,
     blogs: 500,
     articles: 250,
@@ -744,7 +743,7 @@ const DEFAULT_CHUNK_SIZE: Record<Resurces, number> = {
  * }
  */
 export function generateWXRChunks(
-    resource: Resurces,
+    resource: ShopifyResources,
     data: any[],
     cfg: WXRConfig,
     chunkSize?: number

@@ -18,3 +18,5 @@ export {
 export { isShopifyProject } from "./dashboard-routes"
 export type { ResourceKey } from "./sharedResources";
 export { getRedisClient } from "./redis"
+export type { ShopifyResources, WordPressResource } from "./sharedResources"
+export { MMC_RESOURCES, WOO_RESOURCES } from "./sharedResources"

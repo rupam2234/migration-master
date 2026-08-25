@@ -1,6 +1,11 @@
-import { Resurces } from "@/app/api/shopify/[resources]/fetch/route";
 import { FileTextIcon, Image, Layers, NewspaperIcon, ShoppingCartIcon, Ticket, UsersIcon } from "lucide-react";
 import { ElementType } from "react";
+
+export type Tags = "Check Status" | "Connected" | "Not Connected" | "Checking...";
+
+export type Status = {
+    color: string;
+};
 
 export const ResourceTypes = {
     PRODUCTS: "products",
@@ -11,13 +16,21 @@ export const ResourceTypes = {
     BLOGS: "blogs",
     ARTICLES: "articles",
     IMAGES: "images",
-} as const satisfies Record<string, Resurces>;
+} as const satisfies Record<string, ShopifyResources>;
 
 export type ResourceKey = keyof typeof ResourceTypes;
 
 type Services = {
     label: string;
-    type: Resurces;
+    type: ShopifyResources;
+    description: string;
+    icon: ElementType;
+    accent: string;
+};
+
+export type WordPressService = {
+    label: string;
+    type: WordPressResource;
     description: string;
     icon: ElementType;
     accent: string;
@@ -71,7 +84,7 @@ export const RESOURCE_CONFIG: Record<ResourceKey, Services> = {
         type: "coupons",
         label: "Coupons",
         description:
-            "Shopify discount codes and free-shipping coupons for WooCommerce.",
+            "Shop discount codes and free-shipping coupons.",
         icon: Ticket,
         accent: "bg-amber-500/10 text-amber-600",
     },
@@ -85,3 +98,38 @@ export const RESOURCE_CONFIG: Record<ResourceKey, Services> = {
 };
 
 export const RESOURCE_KEYS = Object.keys(ResourceTypes) as ResourceKey[];
+
+export const WordPressResourceTypes = {
+    posts: "posts",
+    pages: "pages",
+    media: "media",
+    categories: "categories",
+    products: "products",
+    orders: "orders",
+    customers: "customers",
+    coupons: "coupons",
+} as const satisfies Record<string, WordPressResource>;
+
+export type ShopifyResources =
+    | "single_article"
+    | "articles"
+    | "blogs"
+    | "pages"
+    | "orders"
+    | "images"
+    | "products"
+    | "customers"
+    | "coupons";
+
+export type WordPressResource =
+    | "posts"
+    | "pages"
+    | "media"
+    | "categories"
+    | "products"
+    | "orders"
+    | "customers"
+    | "coupons";
+
+export const MMC_RESOURCES: WordPressResource[] = ["posts", "pages", "media", "categories"];
+export const WOO_RESOURCES: WordPressResource[] = ["products", "orders", "customers", "coupons"];

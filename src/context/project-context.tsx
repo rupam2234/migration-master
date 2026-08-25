@@ -1,7 +1,7 @@
 "use client";
 
-import { ResourceKey, WXRConfig } from "@/lib";
-import {
+import { ResourceKey, WordPressResource, WXRConfig } from "@/lib";
+import React, {
   createContext,
   ReactNode,
   useContext,
@@ -18,6 +18,10 @@ interface ProjectContextValue {
   setShopifyData: React.Dispatch<
     React.SetStateAction<Record<ResourceKey, unknown>>
   >;
+  wordPressData: Record<WordPressResource, any[]>;
+  setWordPressData: React.Dispatch<
+    React.SetStateAction<Record<WordPressResource, any[]>>
+  >;
   wpImportSettings: WXRConfig;
   setWpImportntSettings: React.Dispatch<React.SetStateAction<WXRConfig>>;
 }
@@ -30,6 +34,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [activeProject, setActiveProject] = useState<string | null>(null);
   const [allProjects, setAllProjects] = useState<string[]>([]);
   const [shopifyData, setShopifyData] = useState<Record<string, unknown>>({});
+  const [wordPressData, setWordPressData] = useState<
+    Record<WordPressResource, any[]>
+  >({
+    posts: [],
+    categories: [],
+    coupons: [],
+    customers: [],
+    media: [],
+    orders: [],
+    pages: [],
+    products: [],
+  });
   const [wpImportSettings, setWpImportntSettings] = useState<WXRConfig>({
     siteUrl: "",
     defaultAuthor: "admin",
@@ -49,6 +65,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setAllProjects,
         shopifyData,
         setShopifyData,
+        wordPressData,
+        setWordPressData,
         setWpImportntSettings,
         wpImportSettings,
       }}

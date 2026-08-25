@@ -130,10 +130,10 @@ function mmc_admin_init() {
     add_action('admin_post_mmc_save_settings', 'mmc_handle_save_settings');
     add_action('admin_post_mmc_connect', 'mmc_handle_connect');
     add_action('admin_post_mmc_disconnect', 'mmc_handle_disconnect');
-    add_action('rest_api_init', 'mmc_register_routes');
 }
 add_action('admin_init', 'mmc_admin_init');
 add_action('admin_init', 'mmc_maybe_bootstrap_connection');
+add_action('rest_api_init', 'mmc_register_routes');
 
 function mmc_maybe_bootstrap_connection() {
     if (!is_admin()) {

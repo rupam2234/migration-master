@@ -1,5 +1,4 @@
-import { Resurces } from "@/app/api/shopify/[resources]/fetch/route";
-import { generateWXRChunks, getCurrentUser, WXRConfig } from "@/lib";
+import { generateWXRChunks, getCurrentUser, ShopifyResources, WXRConfig } from "@/lib";
 import { NextRequest, NextResponse } from "next/server";
 
 export interface WPimportProps {
@@ -9,7 +8,7 @@ export interface WPimportProps {
     part?: number, // which chunk to return
 }
 
-export async function POST(req: NextRequest, { params }: { params: { resources: Resurces } }) {
+export async function POST(req: NextRequest, { params }: { params: { resources: ShopifyResources } }) {
     const { resources } = params;
     const { cfg, data, chunkSize, part = 1 }: WPimportProps = await req.json()
 

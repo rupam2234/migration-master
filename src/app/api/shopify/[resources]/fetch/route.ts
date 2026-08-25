@@ -1,4 +1,4 @@
-import { getCurrentUser, pool, refreshShopifyAccessToken } from "@/lib";
+import { getCurrentUser, pool, refreshShopifyAccessToken, ShopifyResources, } from "@/lib";
 import { unstable_cache } from "next/cache";
 import type { ShopifyCoupon } from "@/lib/wxr_generator";
 import { NextRequest, NextResponse } from "next/server";
@@ -7,18 +7,7 @@ const API_VERSION = "2026-01";
 const PAGE_SIZE = 50;
 const REVALIDATE_IN = 5 * 60;
 
-export type Resurces =
-  | "single_article"
-  | "articles"
-  | "blogs"
-  | "pages"
-  | "orders"
-  | "images"
-  | "products"
-  | "customers"
-  | "coupons";
-
-const QUERY_MAP: Record<Resurces, string> = {
+const QUERY_MAP: Record<ShopifyResources, string> = {
   customers: `
       query GetCustomers($cursor: String) {
         customers(first: ${PAGE_SIZE}, after: $cursor) {
@@ -526,12 +515,12 @@ function normalizeCouponsFromDiscountNode(node: DiscountNodeRecord): ShopifyCoup
       notes.push("Shopify minimum quantity rules cannot be mapped directly to WooCommerce coupons.");
     }
 
-  return codes.map((code: string) => ({
-    ...base,
-    id: `${node.id}:${code}`,
-    code,
-    discountType,
-    couponAmount,
+    return codes.map((code: string) => ({
+      ...base,
+      id: `${node.id}:${code}`,
+      code,
+      discountType,
+      couponAmount,
       discountCurrency: value?.amount?.currencyCode ?? null,
       appliesOnEachItem: Boolean(value?.appliesOnEachItem),
       productIds: restrictionIds,
@@ -575,11 +564,11 @@ function normalizeCouponsFromDiscountNode(node: DiscountNodeRecord): ShopifyCoup
       notes.push("Shipping destination restrictions were detected and will be preserved as a note only.");
     }
 
-  return codes.map((code: string) => ({
-    ...base,
-    id: `${node.id}:${code}`,
-    code,
-    discountType: "free_shipping",
+    return codes.map((code: string) => ({
+      ...base,
+      id: `${node.id}:${code}`,
+      code,
+      discountType: "free_shipping",
       couponAmount: 0,
       discountCurrency: null,
       appliesOnEachItem: false,
@@ -709,7 +698,7 @@ async function throttleBetweenReq(json: any) {
 }
 
 async function fetchAllResources(
-  resources: Resurces,
+  resources: ShopifyResources,
   shopDomain: string,
   accessToken: string,
   blogId?: string
@@ -850,7 +839,7 @@ async function fetchAllResources(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { resources: Resurces } } // path params shopify/[resources]/route.ts
+  { params }: { params: { resources: ShopifyResources } } // path params shopify/[resources]/route.ts
 ) {
   const { resources } = params;
 
