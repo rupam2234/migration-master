@@ -133,3 +133,4 @@ export type WordPressResource =
 
 export const MMC_RESOURCES: WordPressResource[] = ["posts", "pages", "media", "categories"];
 export const WOO_RESOURCES: WordPressResource[] = ["products", "orders", "customers", "coupons"];
+

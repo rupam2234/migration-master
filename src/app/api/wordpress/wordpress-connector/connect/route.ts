@@ -10,10 +10,15 @@ type ConnectorConnectBody = {
   admin_url?: string;
   wp_version?: string;
   plugin_version?: string;
+  woocommerce_active?: boolean;
+  woo_consumer_key?: string | null;
+  woo_consumer_secret?: string | null;
 };
 
 export async function POST(req: NextRequest) {
+  console.log("MMC CONNECT ROUTE VERSION: v2-with-woo-fields");
   const body = (await req.json().catch(() => null)) as ConnectorConnectBody | null;
+  console.log("Incoming body:", JSON.stringify(body, null, 2));
   const token = body?.token?.trim();
   const siteUrl = normalizeMaybeUrl(body?.site_url);
 
@@ -50,26 +55,31 @@ export async function POST(req: NextRequest) {
 
     const updatedCredentials = {
       ...(project.source_credentials ?? {}),
+      connectorToken: token, // plaintext, used to authenticate against the plugin's own REST routes
       connectorTokenHash: tokenHash,
-      connectorState: "CONNECTED",
-      connectedAt: new Date().toISOString(),
+      // connectorState: "CONNECTED",
+      // connectedAt: new Date().toISOString(),
       siteUrl,
       siteName: body?.site_name?.trim() || null,
       restUrl: normalizeMaybeUrl(body?.rest_url),
       adminUrl: normalizeMaybeUrl(body?.admin_url),
       wpVersion: body?.wp_version?.trim() || null,
       pluginVersion: body?.plugin_version?.trim() || null,
+      wooCommerceActive: body?.woocommerce_active ?? false,
+      wooConsumerKey: body?.woo_consumer_key?.trim() || null,
+      wooConsumerSecret: body?.woo_consumer_secret?.trim() || null,
     };
 
     const updatedMetadata = {
       ...(project.metadata ?? {}),
       connector: {
         state: "CONNECTED",
-        connectedAt: new Date().toISOString(),
-        siteUrl,
-        siteName: body?.site_name?.trim() || null,
+        // connectedAt: new Date().toISOString(),
+        // siteUrl,
+        // siteName: body?.site_name?.trim() || null,
         wpVersion: body?.wp_version?.trim() || null,
         pluginVersion: body?.plugin_version?.trim() || null,
+        wooCommerceActive: body?.woocommerce_active ?? false,
       },
     };
 
@@ -107,6 +117,5 @@ export async function POST(req: NextRequest) {
 
 function normalizeMaybeUrl(value?: string | null) {
   if (!value) return null;
-
   return value.trim().replace(/\/$/, "");
 }

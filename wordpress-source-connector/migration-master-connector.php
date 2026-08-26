@@ -13,6 +13,7 @@ if (!defined('ABSPATH')) {
 
 define('MMC_VERSION', '0.1.0');
 define('MMC_OPTION_KEY', 'mmc_connector_settings');
+define('MMC_WOO_KEYS_OPTION', 'mmc_woo_api_keys');
 define('MMC_REST_NAMESPACE', 'migration-master/v1');
 
 function mmc_default_settings() {
@@ -59,6 +60,70 @@ function mmc_read_install_config() {
     return is_array($decoded) ? $decoded : array();
 }
 
+/**
+ * Returns a valid WooCommerce API key pair, reusing a cached pair only if it
+ * still exists (i.e. hasn't been manually revoked) in WooCommerce's own
+ * key table. If the cached pair is missing/stale, it is discarded and a
+ * fresh pair is generated.
+ *
+ * @return array|null ['consumer_key' => ..., 'consumer_secret' => ...] or null if WooCommerce isn't active / generation failed.
+ */
+function mmc_get_or_create_woocommerce_keys() {
+    if (!class_exists('WooCommerce')) {
+        return null;
+    }
+
+    $existing = get_option(MMC_WOO_KEYS_OPTION);
+
+    if (
+        !empty($existing['consumer_key']) &&
+        !empty($existing['consumer_secret']) &&
+        mmc_woo_key_still_valid($existing['consumer_key'])
+    ) {
+        return $existing;
+    }
+
+    // Cached pair is missing, incomplete, or was revoked on the WooCommerce side.
+    // Clear it out so we don't keep re-checking a dead value, then regenerate.
+    delete_option(MMC_WOO_KEYS_OPTION);
+
+    $admin_id = mmc_get_admin_user_id();
+    $generated = mmc_generate_woocommerce_keys($admin_id);
+
+    if (is_wp_error($generated)) {
+        return null;
+    }
+
+    update_option(MMC_WOO_KEYS_OPTION, $generated);
+
+    return $generated;
+}
+
+/**
+ * Checks whether a given (plaintext) consumer key still has a matching row
+ * in WooCommerce's own API keys table — i.e. hasn't been manually revoked
+ * via WooCommerce -> Settings -> Advanced -> REST API.
+ *
+ * @param string $consumer_key Plaintext consumer key (e.g. 'ck_...').
+ * @return bool
+ */
+function mmc_woo_key_still_valid($consumer_key) {
+    global $wpdb;
+
+    if (empty($consumer_key) || !function_exists('wc_api_hash')) {
+        return false;
+    }
+
+    $hashed = wc_api_hash($consumer_key);
+
+    $exists = $wpdb->get_var($wpdb->prepare(
+        "SELECT key_id FROM {$wpdb->prefix}woocommerce_api_keys WHERE consumer_key = %s",
+        $hashed
+    ));
+
+    return !empty($exists);
+}
+
 function mmc_attempt_connect(array $settings) {
     $app_url = mmc_normalize_url($settings['app_url'] ?? '');
     $token = trim((string) ($settings['connection_token'] ?? ''));
@@ -66,6 +131,8 @@ function mmc_attempt_connect(array $settings) {
     if (empty($app_url) || empty($token)) {
         return new WP_Error('mmc_missing_fields', 'App URL and connection token are required.');
     }
+
+    $woo_keys = mmc_get_or_create_woocommerce_keys();
 
     $payload = array(
         'token' => $token,
@@ -75,6 +142,9 @@ function mmc_attempt_connect(array $settings) {
         'admin_url' => admin_url(),
         'wp_version' => get_bloginfo('version'),
         'plugin_version' => MMC_VERSION,
+        'woocommerce_active' => class_exists('WooCommerce'),
+        'woo_consumer_key' => $woo_keys['consumer_key'] ?? null,
+        'woo_consumer_secret' => $woo_keys['consumer_secret'] ?? null,
     );
 
     $response = wp_remote_post(
@@ -641,4 +711,58 @@ function mmc_normalize_url($value) {
     $value = preg_replace('#^https?://#i', 'https://', $value);
 
     return untrailingslashit($value);
+}
+
+/**
+ * Generates a new WooCommerce REST API key pair (read-only) and stores it,
+ * mimicking WooCommerce's own admin "Add key" flow.
+ *
+ * @param int $user_id WordPress user ID the key is attributed to (should have manage_woocommerce capability).
+ * @return array|WP_Error ['consumer_key' => 'ck_...', 'consumer_secret' => 'cs_...'] or WP_Error on failure.
+ */
+function mmc_generate_woocommerce_keys($user_id) {
+    if (!class_exists('WooCommerce')) {
+        return new WP_Error('mmc_woo_missing', 'WooCommerce is not active on this site.');
+    }
+
+    if (!function_exists('wc_rand_hash') || !function_exists('wc_api_hash')) {
+        return new WP_Error('mmc_woo_internal_missing', 'Required WooCommerce internal functions are unavailable.');
+    }
+
+    global $wpdb;
+
+    $consumer_key    = 'ck_' . wc_rand_hash();
+    $consumer_secret = 'cs_' . wc_rand_hash();
+
+    $result = $wpdb->insert(
+        $wpdb->prefix . 'woocommerce_api_keys',
+        array(
+            'user_id'         => absint($user_id),
+            'description'     => 'Migration Master Connector (auto-generated)',
+            'permissions'     => 'read',
+            'consumer_key'    => wc_api_hash($consumer_key),
+            'consumer_secret' => $consumer_secret,
+            'truncated_key'   => substr($consumer_key, -7),
+        ),
+        array('%d', '%s', '%s', '%s', '%s', '%s')
+    );
+
+    if (!$result) {
+        return new WP_Error('mmc_woo_key_insert_failed', 'Failed to insert WooCommerce API key: ' . $wpdb->last_error);
+    }
+
+    // Return plaintext values — WooCommerce only stores the hashed key,
+    // so this is the ONLY moment the plaintext consumer_key is available.
+    return array(
+        'consumer_key'    => $consumer_key,
+        'consumer_secret' => $consumer_secret,
+    );
+}
+
+/**
+ * Picks a suitable admin user to attribute the generated API key to.
+ */
+function mmc_get_admin_user_id() {
+    $admins = get_users(array('role' => 'administrator', 'number' => 1, 'orderby' => 'ID'));
+    return !empty($admins) ? $admins[0]->ID : 1;
 }
