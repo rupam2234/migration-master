@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import styles from "./style.module.css";
 import TransferStatsBadge from "@/components/theme/TransferStatsBadge";
+import TrustpilotBar from "@/components/theme/trustpilot-bar";
 import { Container, Footer, Header } from "@/components";
 import { calculateTieredPrice, TIERED_PRICING } from "@/lib/pricing/tiered";
 
@@ -242,6 +243,8 @@ export default function Main() {
       <Header nav items={NAV_ITEMS} />
 
       <Container>
+        <TrustpilotBar />
+
         <section className={`${styles["mm-shell"]} ${styles["mm-hero"]}`}>
           <div>
             {/* <p className={styles["mm-eyebrow"]}>

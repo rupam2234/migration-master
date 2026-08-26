@@ -149,7 +149,7 @@
 
 /* ---------- hero ---------- */
 .mm-hero {
-    padding: 64px 0 56px;
+    padding: 0 0 56px;
     display: grid;
     gap: 40px;
     grid-template-columns: 1fr;
@@ -207,6 +207,119 @@
 .mm-chip svg {
     color: var(--route);
   }
+/* ---------- trustpilot stripe ---------- */
+.mm-trustbar-wrap {
+    width: 100%;
+    /* background: #fdfcf9; */
+    /* border-bottom: 1px solid var(--paper-line); */
+}
+
+.mm-trustbar {
+    width: 100%;
+    max-width: 1180px;
+    margin: 13px auto;
+    padding: 23px 0px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    line-height: 1;
+}
+
+.mm-trustbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--ink);
+}
+
+.mm-tp-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    background: #00b67a;
+    color: #fff;
+}
+
+.mm-trustbar-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--paper-line);
+}
+
+.mm-trustbar-stars {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.mm-tp-star {
+    position: relative;
+    display: block;
+    width: 20px;
+    height: 20px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.mm-tp-star > span {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mm-tp-star-bg {
+    background: var(--paper-line);
+    color: rgba(28, 43, 51, 0.3);
+}
+
+/* when partially filled, keep the icon at natural origin so clipping
+   reveals the left portion (mirrors how Trustpilot itself renders halves) */
+.mm-tp-star-fill {
+    justify-content: flex-start;
+    background: #00b67a;
+    color: #fff;
+}
+
+.mm-trustbar-score {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.mm-trustbar-label {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.mm-trustbar-count {
+    white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+    .mm-trustbar-divider,
+    .mm-trustbar-count {
+        display: none;
+    }
+
+    .mm-trustbar {
+        padding-top: 11px;
+        padding-bottom: 11px;
+        font-size: 0.74rem;
+    }
+}
 
 .mmBadge {
     display: inline-flex;
