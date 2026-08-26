@@ -16,9 +16,9 @@ type ConnectorConnectBody = {
 };
 
 export async function POST(req: NextRequest) {
-  console.log("MMC CONNECT ROUTE VERSION: v2-with-woo-fields");
+  // console.log("MMC CONNECT ROUTE VERSION: v2-with-woo-fields");
   const body = (await req.json().catch(() => null)) as ConnectorConnectBody | null;
-  console.log("Incoming body:", JSON.stringify(body, null, 2));
+  // console.log("Incoming body:", JSON.stringify(body, null, 2));
   const token = body?.token?.trim();
   const siteUrl = normalizeMaybeUrl(body?.site_url);
 

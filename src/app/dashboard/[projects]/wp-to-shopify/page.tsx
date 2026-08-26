@@ -3,8 +3,6 @@
 import { useProjectContext } from "@/context";
 import {
   MMC_RESOURCES,
-  Status,
-  Tags,
   WOO_RESOURCES,
   WordPressResource,
   WordPressService,
@@ -12,6 +10,7 @@ import {
 import { isShopifyProject } from "@/lib/dashboard-routes";
 import {
   ArrowRightIcon,
+  ExternalLinkIcon,
   FileTextIcon,
   ImageIcon,
   Loader2Icon,
@@ -23,23 +22,8 @@ import {
   UsersIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ElementType, useEffect, useState } from "react";
+import { ElementType, ReactNode, useCallback, useEffect, useState } from "react";
 import { cachedData, cleanExpiredCache } from "@/lib/cache";
-
-const wpConnection: Record<Tags, Status> = {
-  "Check Status": {
-    color: "text-primary/60",
-  },
-  Connected: {
-    color: "text-green-400",
-  },
-  "Not Connected": {
-    color: "text-red-400",
-  },
-  "Checking...": {
-    color: "text-primary/60",
-  },
-};
 
 const WORDPRESS_RESOURCE_CONFIG: Record<WordPressResource, WordPressService> = {
   posts: {
@@ -107,80 +91,148 @@ const WORDPRESS_RESOURCE_CONFIG: Record<WordPressResource, WordPressService> = {
   },
 };
 
+type ConnectionStatusTag = "Checking..." | "Connected" | "Pending" | "Not Connected";
+
+const CONNECTION_STATUS_STYLES: Record<ConnectionStatusTag, string> = {
+  "Checking...": "text-primary/60",
+  Connected: "text-green-400",
+  Pending: "text-amber-400",
+  "Not Connected": "text-red-400",
+};
+
+interface ShopifyImportConnection {
+  id: string | null;
+  projectName: string | null;
+  shopDomain: string | null;
+  status: string | null;
+  connected: boolean;
+  channelProvisioned?: boolean;
+  connectUrl: string | null;
+  credentials?: Record<string, unknown> | null;
+}
+
 export default function WpToShopifyDashboard() {
   const { activeProject, wordPressData, setWordPressData } =
     useProjectContext();
   const isSuitableProject = !isShopifyProject(activeProject);
-  const [wpConnected, setWpConnection] =
-    useState<keyof typeof wpConnection>("Check Status");
-  const [loading, setLoading] = useState<boolean>(false);
+  const [wpStatus, setWpStatus] = useState<ConnectionStatusTag>("Checking...");
+  const [wpChecking, setWpChecking] = useState<boolean>(false);
+  const [shopifyStatus, setShopifyStatus] =
+    useState<ConnectionStatusTag>("Checking...");
+  const [shopifyChecking, setShopifyChecking] = useState<boolean>(false);
+  const [shopifyConnection, setShopifyConnection] =
+    useState<ShopifyImportConnection | null>(null);
 
   useEffect(() => {
     cleanExpiredCache({ prefix: "wp-cache:", session_Storage: true });
   }, []);
 
+  const checkWordPressConnection = useCallback(async () => {
+    if (!activeProject || !isSuitableProject) return;
+
+    setWpChecking(true);
+
+    try {
+      const res = await fetch("/api/wordpress/wordpress-connector/status", {
+        headers: {
+          "x-site": activeProject,
+          "Content-Type": "Application/json",
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to verify WordPress connection");
+      }
+
+      const data: { source_status?: boolean } = await res.json();
+
+      setWpStatus(data.source_status === true ? "Connected" : "Not Connected");
+    } catch (error) {
+      console.error("WordPress connection check failed:", error);
+      setWpStatus("Not Connected");
+    } finally {
+      setWpChecking(false);
+    }
+  }, [activeProject, isSuitableProject]);
+
+  const checkShopifyConnection = useCallback(async () => {
+    if (!activeProject || !isSuitableProject) return;
+
+    setShopifyChecking(true);
+
+    try {
+      const res = await fetch(
+        `/api/shopify/import-connection?project=${encodeURIComponent(
+          activeProject,
+        )}`,
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to load the Shopify destination");
+      }
+
+      const data: ShopifyImportConnection = await res.json();
+
+      setShopifyConnection(data);
+
+      let nextStatus: ConnectionStatusTag = "Not Connected";
+
+      if (data.connected) {
+        nextStatus = "Connected";
+      } else if (data.status === "PENDING") {
+        nextStatus = "Pending";
+      }
+
+      setShopifyStatus(nextStatus);
+    } catch (error) {
+      console.error("Shopify connection check failed:", error);
+      setShopifyConnection(null);
+      setShopifyStatus("Not Connected");
+    } finally {
+      setShopifyChecking(false);
+    }
+  }, [activeProject, isSuitableProject]);
+
   useEffect(() => {
-    if (loading || !activeProject || !isSuitableProject) return;
-    setWpConnection("Checking...");
-    setLoading(true);
+    checkWordPressConnection();
+    checkShopifyConnection();
+  }, [checkWordPressConnection, checkShopifyConnection]);
 
-    const checkConnection = async () => {
-      const res = await fetch("/api/wordpress/wordpress-connector/status", {
-        headers: {
-          "x-site": activeProject,
-          "Content-Type": "Application/json",
-        },
-      });
+  // Live hand-off detection: the merchant completes Shopify OAuth in another
+  // tab (the Connect link opens target="_blank"), so nothing pushes the flip
+  // back to this dashboard — poll while pending and refresh on window focus
+  // / tab visibility instead of requiring a manual reload.
+  useEffect(() => {
+    if (!activeProject || !isSuitableProject || shopifyStatus === "Connected") {
+      return;
+    }
 
-      if (!res.ok) {
-        const errorData: any = await res.json();
-        console.log(errorData.message);
-        setLoading(false);
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const stop = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
       }
-
-      const data: any = await res.json();
-
-      setWpConnection(
-        data.source_status === true ? "Connected" : "Not Connected",
-      );
-
-      setLoading(false);
     };
+    const start = () => {
+      if (!timer) timer = setInterval(checkShopifyConnection, 5000);
+    };
+    const onVisibility = () =>
+      document.visibilityState === "visible"
+        ? start()
+        : stop();
 
-    checkConnection();
-  }, [activeProject]);
+    start();
+    window.addEventListener("focus", checkShopifyConnection);
+    document.addEventListener("visibilitychange", onVisibility);
 
-  async function checkConnection() {
-    if (loading || !activeProject) return;
-
-    setLoading(true);
-    setWpConnection("Checking...");
-
-    const delayedReq = setTimeout(async () => {
-      const res = await fetch("/api/wordpress/wordpress-connector/status", {
-        headers: {
-          "x-site": activeProject,
-          "Content-Type": "Application/json",
-        },
-      });
-
-      if (!res.ok) {
-        const errorData: any = await res.json();
-        console.log(errorData.message);
-        setLoading(false);
-      }
-
-      const data: any = await res.json();
-
-      setWpConnection(
-        data.source_status === true ? "Connected" : "Not Connected",
-      );
-
-      setLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(delayedReq);
-  }
+    return () => {
+      stop();
+      window.removeEventListener("focus", checkShopifyConnection);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [activeProject, isSuitableProject, shopifyStatus, checkShopifyConnection]);
 
   if (!activeProject) {
     return (
@@ -210,6 +262,8 @@ export default function WpToShopifyDashboard() {
       </div>
     );
   }
+
+  const shopifyConnectUrl = shopifyConnection?.connectUrl ?? null;
 
   async function fetchResource(resource: WordPressResource) {
     if (!activeProject) return false;
@@ -248,6 +302,8 @@ export default function WpToShopifyDashboard() {
         [resource]: items,
       }));
 
+      console.log(items);
+
       return false;
     } catch (error) {
       console.error("Error fetching data", error);
@@ -257,7 +313,7 @@ export default function WpToShopifyDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center md:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-sm font-semibold tracking-tight">
             Export WordPress Contents
@@ -268,34 +324,77 @@ export default function WpToShopifyDashboard() {
             import ready files.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-primary/60">
-          <span>WordPress Connection: </span>
-          <span className="relative flex h-1.5 w-1.5 shrink-0">
-            {wpConnected === "Connected" && (
-              <span
-                className={`absolute inline-flex h-full w-full animate-ping rounded-full ${wpConnection[wpConnected].color} opacity-60`}
-              />
-            )}
-            <span
-              className={`relative inline-flex h-1.5 w-1.5 rounded-full ${wpConnection[wpConnected].color}`}
-            />
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <ConnectionChip
+            label="WordPress Source"
+            status={wpStatus}
+            busy={wpChecking}
+            action={
+              <button
+                type="button"
+                onClick={() => {
+                  if (!wpChecking) checkWordPressConnection();
+                }}
+                disabled={wpChecking}
+                title="Re-check WordPress connection"
+                className="rounded-md p-1 text-primary/30 transition-colors hover:bg-primary/5 hover:text-primary/70 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Loader2Icon
+                  size={13}
+                  className={wpChecking ? "animate-spin" : ""}
+                />
+              </button>
+            }
+          />
 
-          <span
-            className={`font-medium tracking-tight ${wpConnection[wpConnected].color}`}
-          >
-            {wpConnected}
-          </span>
+          <ConnectionChip
+            label="Shopify Destination"
+            status={shopifyStatus}
+            busy={shopifyChecking}
+            title={shopifyConnection?.shopDomain ?? undefined}
+            action={
+              <div className="flex items-center gap-0.5">
+                {shopifyStatus === "Pending" && shopifyConnectUrl && (
+                  <a
+                    href={shopifyConnectUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Approve app access on Shopify"
+                    className="inline-flex items-center gap-1 rounded-md border border-primary/15 bg-primary/5 px-2 py-0.5 text-[11px] font-medium leading-5 text-primary transition-colors hover:bg-primary/10"
+                  >
+                    Connect
+                    <ExternalLinkIcon size={11} />
+                  </a>
+                )}
 
-          <span className="h-3 w-px bg-primary/10" />
-
-          <Loader2Icon
-            className={`${loading ? "animate-spin text-primary/60" : "text-primary/30"} hover:text-primary/70 rounded-md p-0.5 cursor-pointer transition-colors duration-200`}
-            size={18}
-            onClick={checkConnection}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!shopifyChecking) checkShopifyConnection();
+                  }}
+                  disabled={shopifyChecking}
+                  title="Re-check Shopify connection"
+                  className="rounded-md p-1 text-primary/30 transition-colors hover:bg-primary/5 hover:text-primary/70 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Loader2Icon
+                    size={13}
+                    className={shopifyChecking ? "animate-spin" : ""}
+                  />
+                </button>
+              </div>
+            }
           />
         </div>
       </div>
+
+      {shopifyStatus === "Pending" && (
+        <p className="-mt-1 mb-2 flex items-center gap-1.5 text-[11px] font-medium text-primary/45">
+          <Loader2Icon size={11} className="animate-spin" />
+          {shopifyConnection?.channelProvisioned === false
+            ? "Channel provisioning missing on Migration Master side — re-save the project to backfill."
+            : "Waiting on Shopify approval — this panel refreshes automatically once you approve."}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[...MMC_RESOURCES, ...WOO_RESOURCES].map((assetType) => {
@@ -414,6 +513,52 @@ function ResourceCard({
           )}
         </button>
       </div>
+    </div>
+  );
+}
+
+function ConnectionChip({
+  label,
+  status,
+  busy,
+  action,
+  title,
+}: {
+  label: string;
+  status: ConnectionStatusTag;
+  busy?: boolean;
+  action?: ReactNode;
+  title?: string;
+}) {
+  const tone = CONNECTION_STATUS_STYLES[busy ? "Checking..." : status];
+
+  return (
+    <div
+      title={title}
+      className="inline-flex h-8 items-center gap-2 rounded-lg border border-primary/10 bg-background py-1 pl-2.5 pr-1.5 text-xs shadow-sm"
+    >
+      <span className="relative flex h-1.5 w-1.5 shrink-0">
+        {status === "Connected" && !busy && (
+          <span
+            className={`absolute inline-flex h-full w-full animate-ping rounded-full ${tone} opacity-60`}
+          />
+        )}
+        <span
+          className={`relative inline-flex h-1.5 w-1.5 rounded-full ${tone} ${
+            busy ? "animate-pulse" : ""
+          }`}
+        />
+      </span>
+
+      <span className="font-medium text-primary/60">{label}</span>
+
+      <span className={`font-medium tracking-tight ${tone}`}>
+        {busy ? "Checking..." : status}
+      </span>
+
+      <span className="h-3 w-px bg-primary/10" />
+
+      {action}
     </div>
   );
 }

@@ -6,8 +6,66 @@ import {
     pool,
     WXRConfig,
 } from "@/lib";
+import { generateChannelSecret } from "@/lib/channel-secret";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+
+/**
+ * Reverse-flow credential stewarding. The SaaS is the SOLE writer of
+ * migration_connections.destination_* state (see REVERSE_MIGRATION_PLAN.md,
+ * Implementation Status §Step 1 shared-database design):
+ *
+ *  WHO mints the channel secret: this handler, running under an
+ *      authenticated dashboard session — the only code path that inserts
+ *      migration_connections rows.
+ *  WHEN: at first insert of a destination_platform='Shopify' row; preserved
+ *      untouched afterwards; lazily backfilled if a legacy row lacks one;
+ *      regenerated only when a caller explicitly supplies its own
+ *      destination_credentials.channelSecret (deliberate rotation).
+ *
+ * Rotation must stay explicit: silent rotation would invalidate in-flight
+ * HMAC-signed /api/mm/v1 imports once Phase 1b verification ships.
+ */
+
+/** Never echo credential-ish fields back to the browser. */
+const SENSITIVE_KEY_RE = /secret|token|password|hmac/i;
+
+/**
+ * Strips credentials from Prisma-style RETURNING rows so responses to the
+ * dashboard never contain the channel secret nor the WordPress connector
+ * token inside metadata.
+ */
+function sanitizeProjectRows(rows: unknown): unknown {
+    if (!Array.isArray(rows)) return rows;
+
+    return rows.map((row) => {
+        if (!row || typeof row !== "object") return row;
+
+        const clone: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+
+        delete clone.source_credentials;
+        delete clone.destination_credentials;
+
+        if (clone.metadata && typeof clone.metadata === "object") {
+            const meta = { ...(clone.metadata as Record<string, unknown>) };
+
+            if (meta.connector && typeof meta.connector === "object") {
+                const conn = { ...(meta.connector as Record<string, unknown>) };
+                delete conn.token;
+                meta.connector = conn;
+            }
+
+            clone.metadata = meta;
+        }
+
+        // Defense-in-depth: drop any other sensitive-looking keys.
+        for (const key of Object.keys(clone)) {
+            if (SENSITIVE_KEY_RE.test(key)) delete clone[key];
+        }
+
+        return clone;
+    });
+}
 
 export interface WPSettingsProps {
     wp_settings: WXRConfig;
@@ -146,6 +204,51 @@ async function createMigrationProject(
             : source_status;
 
     try {
+        // Reverse-channel credential stewarding (see header docs):
+        // merge any caller-provided destination credentials over the stored
+        // ones, minting a channelSecret when none exists yet.
+        let outboundDestinationCredentials = destination_credentials;
+        let effectiveDestinationStatus = destination_status;
+
+        if (destination_platform?.trim().toLowerCase() === "shopify") {
+            const existingRows = await pool.query(
+                `
+                SELECT destination_status, destination_credentials
+                FROM migration_connections
+                WHERE user_id = $1 AND project_name = $2
+                LIMIT 1
+            `,
+                [userId, project_name.trim()],
+            );
+
+            const existing = existingRows?.[0];
+
+            if (effectiveDestinationStatus === "PENDING" && existing?.destination_status === "CONNECTED") {
+                // Idempotent wizard re-save must never silently un-connect.
+                effectiveDestinationStatus = "CONNECTED";
+            }
+
+            const storedCreds =
+                existing?.destination_credentials &&
+                typeof existing.destination_credentials === "object"
+                    ? (existing.destination_credentials as Record<string, unknown>)
+                    : {};
+
+            const mergedCreds: Record<string, unknown> = {
+                ...storedCreds,
+                ...(destination_credentials ?? {}),
+            };
+
+            if (!mergedCreds.channelSecret) {
+                mergedCreds.channelSecret = generateChannelSecret();
+                console.log(
+                    `[wp-settings] minted channelSecret for ${project_name.trim()} (${existing ? "backfill" : "create"})`,
+                );
+            }
+
+            outboundDestinationCredentials = mergedCreds;
+        }
+
         const result = await pool.query(
             `
             INSERT INTO migration_connections (
@@ -170,8 +273,19 @@ async function createMigrationProject(
                 destination_address = EXCLUDED.destination_address,
                 source_status = EXCLUDED.source_status,
                 destination_status = EXCLUDED.destination_status,
-                source_credentials = EXCLUDED.source_credentials,
-                destination_credentials = EXCLUDED.destination_credentials,
+                -- Preserve stored credentials when the caller did not send
+                -- replacements. Re-saving a project from the new-project
+                -- wizard must never wipe destination_credentials.channelSecret
+                -- (kills the reverse-flow connect guard) nor the WordPress
+                -- connector token of an already-connected source.
+                source_credentials = COALESCE(
+                    EXCLUDED.source_credentials,
+                    migration_connections.source_credentials
+                ),
+                destination_credentials = COALESCE(
+                    EXCLUDED.destination_credentials,
+                    migration_connections.destination_credentials
+                ),
                 metadata = EXCLUDED.metadata,
                 updated_at = NOW()
             RETURNING *;
@@ -184,9 +298,9 @@ async function createMigrationProject(
                 source_address.trim(),
                 destination_address.trim(),
                 effectiveSourceStatus,
-                destination_status,
+                effectiveDestinationStatus,
                 connectorCredentials,
-                destination_credentials,
+                outboundDestinationCredentials,
                 {
                     project_name: project_name.trim(),
                     source_platform: source_platform.trim(),
@@ -211,7 +325,7 @@ async function createMigrationProject(
 
         return NextResponse.json(
             {
-                insertMigrationProject: result,
+                insertMigrationProject: sanitizeProjectRows(result),
                 connector: connectorToken
                     ? {
                         token: connectorToken,
