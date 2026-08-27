@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { calculateTieredPrice } from "@/lib/pricing/tiered";
-import { formatExportTotal, type PaymentCurrency } from "@/lib/pricing";
+import { formatExportTotal, formatCurrencyAmount, type PaymentCurrency } from "@/lib/pricing";
 
 type PaymentModalProps = {
   itemIds: string[];
@@ -150,8 +150,18 @@ function CheckoutWrapper({
   const [couponStatus, setCouponStatus] = useState<
     "idle" | "checking" | "valid" | "invalid" | "used"
   >("idle");
-  const normalizedResource = resource === "IMAGES" ? "MEDIA_LIBRARY" : resource;
+    const normalizedResource = resource === "IMAGES" ? "MEDIA_LIBRARY" : resource;
   const minimumCharge = 1;
+
+    // Currency-aware display of the processor minimum floor (e.g. "$1.00" vs "₹92").
+  const minimumChargeDisplay = (() => {
+    if (paymentCurrency === "INR") {
+      const floorInr = minimumCharge * exchangeRate; // $1 → ₹92 at 92x
+      return `${formatCurrencyAmount(floorInr, "INR")} (≈ ${minimumCharge} USD × ${exchangeRate.toFixed(2)})`;
+    }
+    return `${formatCurrencyAmount(minimumCharge, "USD")}`;
+  })();
+
   const originalTotal = formatExportTotal(
     price.total,
     paymentCurrency,
@@ -396,12 +406,7 @@ function CheckoutWrapper({
         )}
       </div>
 
-      <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
-        <div className="flex justify-between">
-          <span>Total</span>
-          <span>{originalTotal}</span>
-        </div>
-
+            <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
         {discount > 0 && (
           <div className="flex justify-between text-green-600">
             <span>Discount</span>
@@ -409,11 +414,18 @@ function CheckoutWrapper({
           </div>
         )}
 
+        {!isFreeViaCoupon && (
+          <div className="flex justify-between">
+            <span>Estimated total</span>
+            <span>{originalTotal}</span>
+          </div>
+        )}
+
         {hasMinimumCharge && (
           <p className="text-xs text-amber-600">
-            Eligible exports under $1.00 are free for your first 3 times. After
-            that, paid exports below $1.00 are rounded up to the $1.00 processor
-            minimum.
+            Eligible exports under {minimumChargeDisplay} are free for your first
+            3 times. After that, paid exports below {minimumChargeDisplay} are
+            rounded up to the processor minimum.
           </p>
         )}
       </div>
