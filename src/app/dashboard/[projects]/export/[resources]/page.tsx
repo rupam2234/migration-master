@@ -534,7 +534,7 @@ export default function ExportResources() {
         initialCurrency={checkoutMeta?.currency ?? "USD"}
         initialExchangeRate={checkoutMeta?.exchangeRate ?? 83}
         freeDownloadsUsed={checkoutMeta?.freeDownloadsUsed ?? 0}
-        freeDownloadsLimit={checkoutMeta?.freeDownloadsLimit ?? 3}
+        // freeDownloadsLimit={checkoutMeta?.freeDownloadsLimit ?? 3}
         eligibleForFree={checkoutMeta?.eligibleForFree ?? false}
         onSuccess={handleExportSuccess}
         onClose={() => {
