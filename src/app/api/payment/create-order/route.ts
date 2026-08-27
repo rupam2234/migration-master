@@ -4,6 +4,7 @@ import {
     getCoupon,
     envInt,
     pool,
+    getCurrentUser,
 } from "@/lib";
 import {
     resolvePaymentCurrency,
@@ -19,6 +20,16 @@ const COUPON_USE_LIMIT_PER_SHOP = envInt("COUPON_USE_LIMIT_PER_SHOP", 1);
 const MINIMUM_CHARGE_USD = 1;
 
 export async function POST(req: NextRequest) {
+
+    const user = await getCurrentUser();
+
+    if (!user?.id) {
+        return NextResponse.json(
+            { error: "User not authenticated" },
+            { status: 401 }
+        );
+    }
+
     const { itemIds, coupon, shopDomain, resource } = await req.json();
 
     if (!Array.isArray(itemIds) || itemIds.length === 0) {
@@ -65,7 +76,6 @@ export async function POST(req: NextRequest) {
     const normalizedCoupon = coupon?.trim().toUpperCase() || undefined;
     const subtotal = calculateTieredPrice(itemCount);
 
-    // --- Coupon lookup + per-shop usage cap ---
     let discount = 0;
     let couponId: number | null = null;
 
@@ -118,8 +128,8 @@ export async function POST(req: NextRequest) {
     const freeUsage = await pool.query(
         `SELECT COUNT(*) AS free_count
          FROM export_jobs
-         WHERE shop_domain = $1 AND status = 'FREE'`,
-        [shopDomain],
+         WHERE user_id = $1 AND status = 'FREE'`,
+        [user?.id],
     );
     const freeCount = Number(freeUsage[0].free_count);
     const freeItemLimit =

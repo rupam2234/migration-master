@@ -1,4 +1,4 @@
-import { envInt, pool } from "@/lib";
+import { envInt, getCurrentUser, pool } from "@/lib";
 import { calculateTieredPrice } from "@/lib/pricing/tiered";
 import {
     resolvePaymentCurrency,
@@ -11,6 +11,16 @@ const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
 const FREE_IMAGE_LIMIT = envInt("FREE_IMAGE_LIMIT", 3000);
 
 export async function POST(req: NextRequest) {
+
+    const user = await getCurrentUser();
+
+    if (!user?.id) {
+        return NextResponse.json(
+            { error: "User not authenticated" },
+            { status: 401 }
+        );
+    }
+
     const { shopDomain, resource, itemIds } = await req.json();
 
     if (!shopDomain || !resource || !Array.isArray(itemIds) || itemIds.length === 0) {
@@ -58,10 +68,10 @@ export async function POST(req: NextRequest) {
         `
             SELECT COUNT(*) AS free_count
             FROM export_jobs
-            WHERE shop_domain = $1
+            WHERE user_id = $1
               AND status = 'FREE'
         `,
-        [shopDomain],
+        [user?.id],
     );
 
     const freeCount = Number(freeUsage[0].free_count);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getCurrentUser, pool, resend, envInt, getCouponById } from "@/lib";
 import { emailTemplate } from "@/components";
+import { razorpay } from "@/lib/razorpay";
 
 const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 3);
 const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
@@ -11,6 +12,13 @@ const COUPON_USE_LIMIT_PER_SHOP = envInt("COUPON_USE_LIMIT_PER_SHOP", 1);
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     const userId = user?.id;
+
+    if (!userId) {
+        return NextResponse.json(
+            { success: false, error: "User not authenticated" },
+            { status: 401 },
+        );
+    }
 
     const {
         razorpay_payment_id,
@@ -34,16 +42,6 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    if (!userId) {
-        return NextResponse.json(
-            {
-                success: false,
-                error: "User not authenticated",
-            },
-            { status: 401 }
-        );
-    }
-
     // Re-derive what's actually new server-side — never trust the client's
     // claim that these ids are unowned, same principle as create-order.
     const owned = await pool.query(
@@ -57,23 +55,21 @@ export async function POST(req: NextRequest) {
     const ownedIds = new Set(owned.map((r: any) => r.item_id));
     const newItemIds = itemIds.filter((id: string) => !ownedIds.has(id));
 
-    const recordOwnership = async (exportJobId: string) => {
-        if (newItemIds.length === 0) return;
-
-        const values = newItemIds
-            .map(
-                (_: string, i: number) =>
-                    `($1, $2, $${i + 3}, $${newItemIds.length + 3})`,
-            )
+    const recordOwnership = async (
+        exportJobId: string,
+        shopDomain: string,
+        resource: string,
+        itemIds: string[],
+    ) => {
+        if (itemIds.length === 0) return;
+        const values = itemIds
+            .map((_, i) => `($1, $2, $${i + 3}, $${itemIds.length + 3})`)
             .join(",");
-
         await pool.query(
-            `
-                INSERT INTO exported_items (shop_domain, resource, item_id, export_job_id)
-                VALUES ${values}
-                ON CONFLICT (shop_domain, resource, item_id) DO NOTHING
-            `,
-            [shopDomain, resource, ...newItemIds, exportJobId],
+            `INSERT INTO exported_items (shop_domain, resource, item_id, export_job_id)
+           VALUES ${values}
+           ON CONFLICT (shop_domain, resource, item_id) DO NOTHING`,
+            [shopDomain, resource, ...itemIds, exportJobId],
         );
     };
 
@@ -162,7 +158,7 @@ export async function POST(req: NextRequest) {
         );
 
         const exportJobId = job[0].id;
-        await recordOwnership(exportJobId);
+        await recordOwnership(exportJobId, shopDomain, resource, itemIds);
 
         return NextResponse.json({
             success: true,
@@ -185,131 +181,182 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    const razorpaySecret = process.env.RAZORPAY_SECRET;
+    // const razorpaySecret = process.env.TEST_RAZORPAY_SECRET; // for testing
+
+    if (!razorpaySecret) {
+        console.error("[verify] RAZORPAY_SECRET is not configured");
+        return NextResponse.json(
+            {
+                success: false,
+                error: "Payment verification is not configured on the server",
+            },
+            { status: 503 },
+        );
+    }
+
     const body =
         razorpay_order_id +
         "|" +
         razorpay_payment_id;
 
     const expectedSignature = crypto
-        .createHmac(
-            "sha256",
-            process.env.RAZORPAY_SECRET!
-        )
+        .createHmac("sha256", razorpaySecret)
         .update(body)
         .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
+        console.error(
+            "[verify] Signature mismatch. Computed from: order_id + '|' + payment_id",
+            "Order ID is truthy:",
+            Boolean(razorpay_order_id),
+            "Payment ID is truthy:",
+            Boolean(razorpay_payment_id),
+            "Signature is truthy:",
+            Boolean(razorpay_signature),
+            "Secret configured:",
+            Boolean(razorpaySecret),
+        );
         return NextResponse.json(
             {
                 success: false,
-                error: "Invalid signature",
+                error:
+                    "Payment signature verification failed. If this persists after a retry, contact support with the payment ID — your card was NOT charged again.",
             },
             { status: 400 }
         );
     }
 
-    const jobResult = await pool.query(
-        `
-                INSERT INTO export_jobs
-                (
-                    user_id,
-                    shop_domain,
-                    item_count,
-                    status,
-                    coupon_id
-                )
-                VALUES
-                    ($1,$2,$3,'PAID',$4)
-                    RETURNING id
-                `,
-        [
-            userId,
-            shopDomain,
-            newItemIds.length,
-            couponId ?? null,
-        ]
-    );
+    const razorpayOrder = await razorpay.orders.fetch(razorpay_order_id);
+    const amount = razorpayOrder.amount;
+    const currency = razorpayOrder.currency;
 
-    const exportJobId = jobResult[0].id;
-    await recordOwnership(exportJobId);
+    if (!amount || !currency) {
+        return NextResponse.json(
+            {
+                success: false,
+                error: "Unable to retrieve payment amount from Razorpay",
+            },
+            { status: 400 }
+        );
+    }
 
-    await pool.query(
-        `
+    // get the coupon details
+    let couponData = null;
+    if (couponId) {
+        couponData = await pool.query(`SELECT code, percent_off FROM coupons WHERE id = $1`, [couponId]);
+    }
+
+    // flow -> fresh order? -> go ahead create a new one -> return the id -> it's a full transection
+    const txResult = await pool.transaction([
+        pool`SELECT pg_advisory_xact_lock(hashtext(${razorpay_order_id}))`,
+        pool`
+          WITH existing AS (
+            SELECT export_job_id
+            FROM payments
+            WHERE razorpay_order_id = ${razorpay_order_id}
+          ), 
+          job AS (
+            INSERT INTO export_jobs (user_id, shop_domain, item_count, status, coupon_id)
+            SELECT ${userId}, ${shopDomain}, ${newItemIds.length}, 'PAID', ${couponId ?? null}
+            WHERE NOT EXISTS (SELECT 1 FROM existing)
+            RETURNING id
+          ),
+          pay AS (
             INSERT INTO payments
             (
                 user_id,
                 export_job_id,
                 provider,
                 status,
+                amount,
+                shop_domain,
+                currency,
                 razorpay_order_id,
                 razorpay_payment_id,
                 razorpay_signature,
+                discount_percent,
+                coupon_code,
                 item_count
             )
-            VALUES
-            (
-                $1,
-                $2,
+            SELECT
+                ${userId},
+                job.id,
                 'razorpay',
                 'PAID',
-                $3,
-                $4,
-                $5,
-                $6
-            )
-            `,
-        [
-            userId,
-            exportJobId,
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
-            newItemIds.length,
-        ]
-    );
+                ${amount as number / 100},
+                ${shopDomain},
+                ${currency},
+                ${razorpay_order_id},
+                ${razorpay_payment_id},
+                ${razorpay_signature},
+                ${couponData?.[0].percent_off},
+                ${couponData?.[0].code},
+                ${newItemIds.length}
+            FROM job
+            RETURNING export_job_id
+          )
+          SELECT
+            COALESCE((SELECT export_job_id FROM existing), (SELECT export_job_id FROM pay)) AS export_job_id,
+            EXISTS(SELECT 1 FROM existing) AS was_duplicate
+        `,
+    ]);
+
+    const { export_job_id: exportJobId, was_duplicate: wasDuplicate } =
+        (txResult[1] as any[])[0];
+
+    await recordOwnership(exportJobId, shopDomain, resource, newItemIds);
+
+    if (wasDuplicate) {
+        // Already processed (and already emailed) on an earlier call for this
+        // exact order_id — confirm success without re-sending the email or
+        // touching billing again.
+        return NextResponse.json({ success: true, exportJobId });
+    }
 
     const baseAddress = process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://migrationmaster.online"
 
     const html = emailTemplate({
         title: `Payment Confirmation — Shopify to WordPress Export`,
         content: `
-        <p>
-          Thank you for your payment. Your order for a Shopify to WordPress export
-          has been successfully completed for <strong>${newItemIds.length} items</strong>
-          from your store <strong>${shopDomain}</strong>.
-        </p>
+            <p>
+                Thank you for your payment. Your order for a Shopify to WordPress
+                export has been successfully completed for
+                <strong>${newItemIds.length} item${newItemIds.length !== 1 ? "s" : ""}</strong>
+                from your store <strong>${shopDomain}</strong>.
+            </p>
     
-        <p>
-          You can view your payment details here:
-          
-            href="https://razorpay.com/payment/${razorpay_payment_id}"
-            style="color:#CC6CE7; text-decoration:underline;"
-          >
-            Payment receipt
-          </a>.
-        </p>
+            <p>
+                You can view your payment details here:
+                <a
+                    href="https://razorpay.com/payment/${razorpay_payment_id}"
+                    style="color:#CC6CE7; text-decoration:underline;"
+                >
+                    Payment receipt
+                </a>.
+            </p>
     
-        <p>
-          You can find more details about this order and track your export status
-          from your
-          
-            href="${baseAddress}/dashboard/${shopDomain}/export-jobs"
-            style="color:#CC6CE7; text-decoration:underline;"
-          >
-            export job details page
-          </a>.
-        </p>
+            <p>
+                You can find more details about this order and track your export
+                status from your
+                <a
+                    href="${baseAddress}/dashboard/${encodeURIComponent(shopDomain)}/export-jobs"
+                    style="color:#CC6CE7; text-decoration:underline;"
+                >
+                    export job details page
+                </a>.
+            </p>
     
-        <p>
-          If you experience any issues during the migration process, our team is
-          always available to help. Feel free to reach out and we'll assist you.
-        </p>
+            <p>
+                If you experience any issues during the migration process, our team
+                is always available to help. Feel free to reach out and we'll assist you.
+            </p>
     
-        <p>
-          Happy migrating!<br />
-          The Migration Master Team
-        </p>
-      `,
+            <p>
+                Happy migrating!<br />
+                The Migration Master Team
+            </p>
+        `,
     });
 
     await resend.emails.send({

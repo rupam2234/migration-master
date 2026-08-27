@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { calculateTieredPrice } from "@/lib/pricing/tiered";
-import { formatExportTotal, formatCurrencyAmount, type PaymentCurrency } from "@/lib/pricing";
+import {
+  formatExportTotal,
+  formatCurrencyAmount,
+  type PaymentCurrency,
+} from "@/lib/pricing";
 
 type PaymentModalProps = {
   itemIds: string[];
   open: boolean;
   shopDomain: string;
   resource: string;
-    initialCurrency?: PaymentCurrency;
+  initialCurrency?: PaymentCurrency;
   initialExchangeRate?: number;
   freeDownloadsUsed?: number;
   freeDownloadsLimit?: number;
@@ -68,7 +72,7 @@ export function PaymentModal({
           Confirm Export
         </h3>
 
-                <p className="text-xs text-gray-400 mb-2">
+        <p className="text-xs text-gray-400 mb-2">
           {itemIds.length} new record
           {itemIds.length !== 1 ? "s" : ""} · {price.formatted}
         </p>
@@ -91,7 +95,6 @@ export function PaymentModal({
               : "This export will be charged"}
           </span>
         </div>
-
 
         {itemIds.length === 0 && (
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -150,10 +153,10 @@ function CheckoutWrapper({
   const [couponStatus, setCouponStatus] = useState<
     "idle" | "checking" | "valid" | "invalid" | "used"
   >("idle");
-    const normalizedResource = resource === "IMAGES" ? "MEDIA_LIBRARY" : resource;
+  const normalizedResource = resource === "IMAGES" ? "MEDIA_LIBRARY" : resource;
   const minimumCharge = 1;
 
-    // Currency-aware display of the processor minimum floor (e.g. "$1.00" vs "₹92").
+  // Currency-aware display of the processor minimum floor (e.g. "$1.00" vs "₹92").
   const minimumChargeDisplay = (() => {
     if (paymentCurrency === "INR") {
       const floorInr = minimumCharge * exchangeRate; // $1 → ₹92 at 92x
@@ -167,8 +170,7 @@ function CheckoutWrapper({
     paymentCurrency,
     exchangeRate,
   );
-  // A 100%-off coupon means FREE (charge $0) — show $0, not the $1 floor.
-  // The $1 processor minimum applies only to a genuine undersized PAID total.
+
   const isFreeViaCoupon = discount >= 100;
   const hasMinimumCharge =
     !isFreeViaCoupon && finalAmount > 0 && finalAmount < minimumCharge;
@@ -339,7 +341,7 @@ function CheckoutWrapper({
         },
 
         name: "Migration Master",
-        description: "Shopify to WordPress Export",
+        description: "Effortless Website Data Migration Utility",
 
         handler: async (response: {
           razorpay_payment_id: string;
@@ -406,7 +408,7 @@ function CheckoutWrapper({
         )}
       </div>
 
-            <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
+      <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
         {discount > 0 && (
           <div className="flex justify-between text-green-600">
             <span>Discount</span>
@@ -423,9 +425,9 @@ function CheckoutWrapper({
 
         {hasMinimumCharge && (
           <p className="text-xs text-amber-600">
-            Eligible exports under {minimumChargeDisplay} are free for your first
-            3 times. After that, paid exports below {minimumChargeDisplay} are
-            rounded up to the processor minimum.
+            Eligible exports under {minimumChargeDisplay} are free for your
+            first 3 times. After that, paid exports below {minimumChargeDisplay}{" "}
+            are rounded up to the processor minimum.
           </p>
         )}
       </div>
