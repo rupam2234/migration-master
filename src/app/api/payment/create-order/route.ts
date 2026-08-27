@@ -6,8 +6,8 @@ import {
     pool,
     refreshShopifyAccessToken,
 } from "@/lib";
+import { calculateTieredPrice } from "@/lib/pricing/tiered";
 import {
-    calculateExportPrice,
     convertExportTotal,
     fetchLiveUsdToInrRate,
     type PaymentCurrency,
@@ -17,6 +17,7 @@ const API_VERSION = "2026-01";
 const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 3);
 const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
 const COUPON_USE_LIMIT_PER_SHOP = envInt("COUPON_USE_LIMIT_PER_SHOP", 1);
+const MINIMUM_CHARGE_USD = 1;
 
 export async function POST(req: NextRequest) {
     const { itemIds, coupon, shopDomain, resource } = await req.json();
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     const itemCount = newItemIds.length;
     const normalizedCoupon = coupon?.trim().toUpperCase() || undefined;
-    const { total: subtotal } = calculateExportPrice(itemCount);
+    const subtotal = calculateTieredPrice(itemCount);
 
     // --- Coupon lookup + per-shop usage cap ---
     let discount = 0;
@@ -91,7 +92,6 @@ export async function POST(req: NextRequest) {
     }
 
     const total = subtotal * (1 - discount / 100);
-    const convertedTotal = convertExportTotal(total, orderCurrency, usdToInrRate);
 
     // --- Free-tier check, independent of coupon ---
     const freeUsage = await pool.query(
@@ -119,11 +119,22 @@ export async function POST(req: NextRequest) {
         });
     }
 
-    let amount = Math.round(convertedTotal * 100);
-
-    if (amount < 100) {
-        amount = 100; // Razorpay minimum — bump up, don't silently waive
+    // Apply the $1 processor minimum to the USD total BEFORE converting to
+    // the order currency, so the amount actually charged (in USD or INR)
+    // always matches what the checkout displays — never a smaller converted
+    // figure that bypasses the floor.
+    let chargeTotalUsd = total;
+    if (chargeTotalUsd > 0 && chargeTotalUsd < MINIMUM_CHARGE_USD) {
+        chargeTotalUsd = MINIMUM_CHARGE_USD;
     }
+
+    const convertedTotal = convertExportTotal(
+        chargeTotalUsd,
+        orderCurrency,
+        usdToInrRate,
+    );
+
+    const amount = Math.round(convertedTotal * 100);
 
     const order = await razorpay.orders.create({
         amount,

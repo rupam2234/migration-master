@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { calculateTieredPrice } from "./tiered";
+import { calculateTieredPrice, TIERED_PRICING } from "./tiered";
 
 const DISCOUNT = 0.15;
 
@@ -48,8 +48,11 @@ export default function PricingCalculator() {
       </div>
 
       <p className="text-xs text-gray-500 mt-4">
-        Based on published tiered rates: $0.10/item for the first 500 items,
-        $0.035/item from 501&ndash;5,000, and $0.0266/item beyond that.
+        Based on published tiered rates: $${TIERED_PRICING.tier1Rate}/item for
+        the first ${TIERED_PRICING.tier1Limit} items, $
+        {TIERED_PRICING.tier2Rate}/item from {TIERED_PRICING.tier1Limit}&ndash;
+        {TIERED_PRICING.tier2Limit}, and ${TIERED_PRICING.tier3Rate}/item beyond
+        that.
       </p>
     </div>
   );

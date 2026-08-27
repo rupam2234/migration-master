@@ -1,15 +1,5 @@
 
-export const PRICE_PER_ITEM = 0.20;
-export const USD_TO_INR_RATE = 83;
-
-export function calculateExportPrice(count: number) {
-    const total = Math.max(0.50, count * PRICE_PER_ITEM);
-    return {
-        count,
-        total,
-        formatted: `$${total.toFixed(2)}`,
-    };
-}
+export const USD_TO_INR_RATE = 92;
 
 export type PaymentCurrency = "USD" | "INR";
 

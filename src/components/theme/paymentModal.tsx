@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { calculateTieredPrice } from "@/lib/pricing/tiered";
 import {
-  calculateExportPrice,
   formatExportTotal,
   type PaymentCurrency,
 } from "@/lib/pricing";
@@ -41,7 +41,12 @@ export function PaymentModal({
 }: PaymentModalProps) {
   if (!open) return null;
 
-  const price = calculateExportPrice(itemIds.length);
+  const total = calculateTieredPrice(itemIds.length);
+  const price = {
+    count: itemIds.length,
+    total,
+    formatted: `$${total.toFixed(2)}`,
+  };
 
   return (
     <div
