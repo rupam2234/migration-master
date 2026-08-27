@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { getCurrentUser, pool, resend, envInt } from "@/lib";
+import { getCurrentUser, pool, resend, envInt, getCouponById } from "@/lib";
 import { emailTemplate } from "@/components";
 
-const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 2);
+const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 3);
 const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
+const FREE_IMAGE_LIMIT = envInt("FREE_IMAGE_LIMIT", 3000);
 const COUPON_USE_LIMIT_PER_SHOP = envInt("COUPON_USE_LIMIT_PER_SHOP", 1);
 
 export async function POST(req: NextRequest) {
@@ -87,22 +88,30 @@ export async function POST(req: NextRequest) {
             // Nothing new to grant — everything requested is already owned.
             eligible = true;
         } else if (couponId) {
-            // Free via a 100%-off coupon — enforce the coupon's own
-            // per-shop usage cap, not the unrelated free-tier item limit.
-            const couponUsage = await pool.query(
-                `
-                    SELECT COUNT(*) AS uses
-                    FROM export_jobs
-                    WHERE coupon_id = $1 AND shop_domain = $2
-                      AND status IN ('PAID','FREE')
-                `,
-                [couponId, shopDomain]
-            );
-
-            const usesSoFar = Number(couponUsage[0].uses);
-            eligible = usesSoFar < COUPON_USE_LIMIT_PER_SHOP;
+            // Free via a valid 100%-off coupon — checked against its own
+            // per-shop usage cap, independent of the free tier. Mirrors
+            // coupons/verify and create-order: SAVE100 is limited to 1 use.
+            const couponRow = await getCouponById(couponId);
+            if (couponRow && couponRow.percentOff >= 100) {
+                const usage = await pool.query(
+                    `
+                        SELECT COUNT(*) AS uses
+                        FROM export_jobs
+                        WHERE coupon_id = $1 AND shop_domain = $2
+                          AND status IN ('PAID','FREE')
+                    `,
+                    [couponId, shopDomain]
+                );
+                const usesSoFar = Number(usage[0].uses);
+                const couponLimit =
+                    couponRow.code === "SAVE100"
+                        ? 1
+                        : COUPON_USE_LIMIT_PER_SHOP;
+                eligible = usesSoFar < couponLimit;
+            }
         } else {
-            // Free via the free tier — enforce the tier's own limits.
+            // Hard free-cap: a new-item export is FREE only while the shop is
+            // below the free-export cap AND within the item/image limit.
             const freeUsage = await pool.query(
                 `
                     SELECT COUNT(*) AS free_count
@@ -113,9 +122,11 @@ export async function POST(req: NextRequest) {
             );
 
             const freeCount = Number(freeUsage[0].free_count);
+            const freeItemLimit =
+                resource === "MEDIA_LIBRARY" ? FREE_IMAGE_LIMIT : FREE_ITEM_LIMIT;
             eligible =
                 freeCount < FREE_EXPORT_LIMIT &&
-                newItemIds.length <= FREE_ITEM_LIMIT;
+                newItemIds.length <= freeItemLimit;
         }
 
         if (!eligible) {

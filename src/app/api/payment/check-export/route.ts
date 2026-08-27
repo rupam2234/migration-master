@@ -1,8 +1,12 @@
 import { envInt, pool } from "@/lib";
 import { calculateTieredPrice } from "@/lib/pricing/tiered";
+import {
+    resolvePaymentCurrency,
+    getUsdToInrRate,
+} from "@/lib/payment-currency";
 import { NextRequest, NextResponse } from "next/server";
 
-const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 2);
+const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 3);
 const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
 const FREE_IMAGE_LIMIT = envInt("FREE_IMAGE_LIMIT", 3000);
 
@@ -15,6 +19,12 @@ export async function POST(req: NextRequest) {
             { status: 400 },
         );
     }
+
+    // Resolve the shopper's currency + live rate up front so the very first
+    // price popup can show INR (for Indian users) or USD with the correct
+    // conversion, matching exactly what create-order will charge.
+    const orderCurrency = await resolvePaymentCurrency(req, shopDomain);
+    const usdToInrRate = await getUsdToInrRate(orderCurrency);
 
     // 1. Which of the selected items are already owned (paid or free)?
     const owned = await pool.query(
@@ -38,6 +48,8 @@ export async function POST(req: NextRequest) {
             ownedCount: ownedIds.size,
             newItemIds: [],
             newCount: 0,
+            currency: orderCurrency,
+            exchangeRate: usdToInrRate,
         });
     }
 
@@ -54,12 +66,14 @@ export async function POST(req: NextRequest) {
 
     const freeCount = Number(freeUsage[0].free_count);
     const remainingFreeExports = Math.max(0, FREE_EXPORT_LIMIT - freeCount);
-    let eligibleForFree = false;
-    if (resource === "MEDIA_LIBRARY") {
-        eligibleForFree = newItemIds.length <= FREE_IMAGE_LIMIT;
-    } else {
-        eligibleForFree = remainingFreeExports > 0 && newItemIds.length <= FREE_ITEM_LIMIT;
-    }
+    const freeDownloadsUsed = freeCount;
+    const freeDownloadsLimit = FREE_EXPORT_LIMIT;
+    const withinItemLimit =
+        resource === "MEDIA_LIBRARY"
+            ? newItemIds.length <= FREE_IMAGE_LIMIT
+            : newItemIds.length <= FREE_ITEM_LIMIT;
+    const eligibleForFree =
+        remainingFreeExports > 0 && withinItemLimit;
 
     // Compute total cost using tiered pricing
     let totalCost = 0;
@@ -85,7 +99,11 @@ export async function POST(req: NextRequest) {
         newItemIds,
         newCount: newItemIds.length,
         remainingFreeExports,
+        freeDownloadsUsed,
+        freeDownloadsLimit,
         eligibleForFree,
         totalCost,
+        currency: orderCurrency,
+        exchangeRate: usdToInrRate,
     });
 }

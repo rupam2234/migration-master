@@ -6,6 +6,7 @@ export { generateWXR, generateWXRChunks } from "./wxr_generator";
 export type { WXRConfig } from "./wxr_generator";
 export { refreshShopifyAccessToken } from "./shopify-refresh";
 export { getCoupon } from "./getCoupon";
+export { getCouponById } from "./getCoupon";
 export { resend } from "./resend";
 export { envInt } from "./env";
 export {

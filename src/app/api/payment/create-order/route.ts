@@ -4,18 +4,17 @@ import {
     getCoupon,
     envInt,
     pool,
-    refreshShopifyAccessToken,
 } from "@/lib";
-import { calculateTieredPrice } from "@/lib/pricing/tiered";
 import {
-    convertExportTotal,
-    fetchLiveUsdToInrRate,
-    type PaymentCurrency,
-} from "@/lib/pricing";
+    resolvePaymentCurrency,
+    getUsdToInrRate,
+} from "@/lib/payment-currency";
+import { calculateTieredPrice } from "@/lib/pricing/tiered";
+import { convertExportTotal } from "@/lib/pricing";
 
-const API_VERSION = "2026-01";
 const FREE_EXPORT_LIMIT = envInt("FREE_EXPORT_LIMIT", 3);
 const FREE_ITEM_LIMIT = envInt("FREE_ITEM_LIMIT", 5);
+const FREE_IMAGE_LIMIT = envInt("FREE_IMAGE_LIMIT", 3000);
 const COUPON_USE_LIMIT_PER_SHOP = envInt("COUPON_USE_LIMIT_PER_SHOP", 1);
 const MINIMUM_CHARGE_USD = 1;
 
@@ -33,8 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const orderCurrency = await resolvePaymentCurrency(req, shopDomain);
-    const usdToInrRate =
-        orderCurrency === "INR" ? await getLiveUsdToInrRate() : 1;
+    const usdToInrRate = await getUsdToInrRate(orderCurrency);
 
     // Re-derive "new" items server-side — never trust that the client only
     // sent unowned items. This mirrors check-export's own logic.
@@ -93,7 +91,30 @@ export async function POST(req: NextRequest) {
 
     const total = subtotal * (1 - discount / 100);
 
-    // --- Free-tier check, independent of coupon ---
+    // --- Free via a valid 100%-off coupon (independent of the free tier) ---
+    // A 100%-off coupon (e.g. SAVE100) is checked against its own per-shop
+    // usage cap in the coupon block above. If it's valid and here, the order
+    // is FREE (charge $0) — NOT floored up to $1. This is separate from the
+    // free-tier cap below.
+    if (discount >= 100) {
+        return NextResponse.json({
+            free: true,
+            itemIds: newItemIds,
+            shopDomain,
+            resource,
+            amount: 0,
+            discount,
+            total: 0,
+            couponId,
+            currency: orderCurrency,
+            exchangeRate: usdToInrRate,
+        });
+    }
+
+    // --- Hard free-tier check (absolute cap, no coupon / under-$1 bypass) ---
+    // A new-item export is FREE only while the shop's total free-export count
+    // is below the cap AND the item count is within the free item/image limit.
+    // Coupons and sub-$1 amounts do NOT grant free beyond this cap.
     const freeUsage = await pool.query(
         `SELECT COUNT(*) AS free_count
          FROM export_jobs
@@ -101,10 +122,12 @@ export async function POST(req: NextRequest) {
         [shopDomain],
     );
     const freeCount = Number(freeUsage[0].free_count);
+    const freeItemLimit =
+        resource === "MEDIA_LIBRARY" ? FREE_IMAGE_LIMIT : FREE_ITEM_LIMIT;
     const withinFreeTier =
-        freeCount < FREE_EXPORT_LIMIT && itemCount <= FREE_ITEM_LIMIT;
+        freeCount < FREE_EXPORT_LIMIT && itemCount <= freeItemLimit;
 
-    if (total <= 0 || withinFreeTier) {
+    if (withinFreeTier) {
         return NextResponse.json({
             free: true,
             itemIds: newItemIds,
@@ -120,9 +143,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Apply the $1 processor minimum to the USD total BEFORE converting to
-    // the order currency, so the amount actually charged (in USD or INR)
-    // always matches what the checkout displays — never a smaller converted
-    // figure that bypasses the floor.
+    // the order currency. This only floors a genuine undersized PAID total
+    // (between $0 and $1) — it does NOT apply to a 0-total from a 100%-off
+    // coupon, which is handled free above, nor to an empty/free order.
     let chargeTotalUsd = total;
     if (chargeTotalUsd > 0 && chargeTotalUsd < MINIMUM_CHARGE_USD) {
         chargeTotalUsd = MINIMUM_CHARGE_USD;
@@ -166,127 +189,4 @@ export async function POST(req: NextRequest) {
         resource,
         couponId,
     });
-}
-
-async function resolvePaymentCurrency(
-    req: NextRequest,
-    shopDomain: string,
-): Promise<PaymentCurrency> {
-    const detectedCountry =
-        req.headers.get("x-vercel-ip-country")?.toUpperCase() ??
-        req.headers.get("cf-ipcountry")?.toUpperCase() ??
-        null;
-
-    if (detectedCountry === "IN") {
-        return "INR";
-    }
-
-    if (detectedCountry) {
-        return "USD";
-    }
-
-    const connection = await pool.query(
-        `
-            SELECT
-                s."accessToken",
-                s."refreshToken",
-                s."expires",
-                s."refreshTokenExpires",
-                sc.status
-            FROM shopify."Session" s
-            JOIN shopify_connections sc
-              ON sc.shop_domain = s.shop
-            WHERE s.shop = $1
-        `,
-        [shopDomain],
-    );
-
-    const credential = connection[0];
-
-    if (!credential) {
-        return "USD";
-    }
-
-    if (credential.status !== "CONNECTED") {
-        return "USD";
-    }
-
-    let accessToken = credential.accessToken;
-    const expiresAt = new Date(credential.expires).getTime();
-
-    if (Date.now() >= expiresAt) {
-        const refreshed = await refreshShopifyAccessToken(
-            shopDomain,
-            credential.refreshToken,
-        );
-
-        accessToken = refreshed.access_token;
-
-        await pool.query(
-            `
-                UPDATE shopify."Session"
-                SET
-                    "accessToken" = $1,
-                    "refreshToken" = $2,
-                    "expires" = NOW() + ($3 * interval '1 second'),
-                    "refreshTokenExpires" = NOW() + ($4 * interval '1 second')
-                WHERE shop = $5
-            `,
-            [
-                refreshed.access_token,
-                refreshed.refresh_token,
-                refreshed.expires_in,
-                refreshed.refresh_token_expires_in,
-                shopDomain,
-            ],
-        );
-    }
-
-    const response = await fetch(
-        `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Shopify-Access-Token": accessToken,
-            },
-            body: JSON.stringify({
-                query: `
-                    query ShopPaymentContext {
-                        shop {
-                            currencyCode
-                            billingAddress {
-                                countryCode
-                            }
-                        }
-                    }
-                `,
-            }),
-            cache: "no-store",
-        },
-    );
-
-    if (!response.ok) {
-        return "USD";
-    }
-
-    const json = await response.json();
-    const shop = json.data?.shop;
-    const currencyCode = String(shop?.currencyCode ?? "").toUpperCase();
-    const countryCode = String(shop?.billingAddress?.countryCode ?? "").toUpperCase();
-
-    if (currencyCode === "INR" || countryCode === "IN") {
-        return "INR";
-    }
-
-    return "USD";
-}
-
-async function getLiveUsdToInrRate(): Promise<number> {
-    try {
-        return await fetchLiveUsdToInrRate();
-    } catch (error) {
-        console.warn("Falling back to static USD/INR rate", error);
-        return 83;
-    }
 }

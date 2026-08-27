@@ -42,6 +42,13 @@ export default function ExportResources() {
   const [newItemIds, setNewItemIds] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [checkoutMeta, setCheckoutMeta] = useState<{
+    currency: "USD" | "INR";
+    exchangeRate: number;
+    freeDownloadsUsed: number;
+    freeDownloadsLimit: number;
+    eligibleForFree: boolean;
+  } | null>(null);
 
   const records = useMemo(() => {
     if (!selectedData) return [];
@@ -312,15 +319,22 @@ export default function ExportResources() {
 
               // Set new items for potential paid export
               setNewItemIds(data.newItemIds ?? []);
+              setCheckoutMeta({
+                currency: data.currency ?? "USD",
+                exchangeRate: data.exchangeRate ?? 83,
+                freeDownloadsUsed:
+                  data.freeDownloadsUsed ??
+                  data.freeCount ??
+                  (data.remainingFreeExports != null
+                    ? Math.max(0, 3 - data.remainingFreeExports)
+                    : 0),
+                freeDownloadsLimit: data.freeDownloadsLimit ?? 3,
+                eligibleForFree: data.eligibleForFree ?? false,
+              });
 
-              // Free tier for images up to 3000 items
-              if (key === "IMAGES" && (data.newItemIds?.length ?? 0) <= 3000) {
-                await generateWordpressImport();
-                setLoading(false);
-                return;
-              }
-
-              // Show payment modal for paid export
+              // Show payment modal — create-order decides free-vs-paid using
+              // the same absolute cap for every resource (images included),
+              // so free exports count toward the limit and get recorded.
               setShowPaymentModal(true);
               setLoading(false);
             }}
@@ -517,6 +531,11 @@ export default function ExportResources() {
         open={showPaymentModal}
         shopDomain={activeProject}
         resource={key === "IMAGES" ? "MEDIA_LIBRARY" : key}
+        initialCurrency={checkoutMeta?.currency ?? "USD"}
+        initialExchangeRate={checkoutMeta?.exchangeRate ?? 83}
+        freeDownloadsUsed={checkoutMeta?.freeDownloadsUsed ?? 0}
+        freeDownloadsLimit={checkoutMeta?.freeDownloadsLimit ?? 3}
+        eligibleForFree={checkoutMeta?.eligibleForFree ?? false}
         onSuccess={handleExportSuccess}
         onClose={() => {
           setShowPaymentModal(false);

@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { calculateTieredPrice } from "@/lib/pricing/tiered";
-import {
-  formatExportTotal,
-  type PaymentCurrency,
-} from "@/lib/pricing";
+import { formatExportTotal, type PaymentCurrency } from "@/lib/pricing";
 
 type PaymentModalProps = {
   itemIds: string[];
   open: boolean;
   shopDomain: string;
   resource: string;
+    initialCurrency?: PaymentCurrency;
+  initialExchangeRate?: number;
+  freeDownloadsUsed?: number;
+  freeDownloadsLimit?: number;
+  eligibleForFree?: boolean;
   onSuccess: (paymentData?: {
     razorpay_payment_id: string;
     razorpay_order_id: string;
@@ -36,6 +38,11 @@ export function PaymentModal({
   itemIds,
   shopDomain,
   resource,
+  initialCurrency,
+  initialExchangeRate,
+  freeDownloadsUsed = 0,
+  freeDownloadsLimit = 3,
+  eligibleForFree = false,
   onSuccess,
   onClose,
 }: PaymentModalProps) {
@@ -61,10 +68,30 @@ export function PaymentModal({
           Confirm Export
         </h3>
 
-        <p className="text-xs text-gray-400 mb-4">
+                <p className="text-xs text-gray-400 mb-2">
           {itemIds.length} new record
           {itemIds.length !== 1 ? "s" : ""} · {price.formatted}
         </p>
+
+        <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          Free downloads used:{" "}
+          <strong>
+            {freeDownloadsUsed}/{freeDownloadsLimit}
+          </strong>{" "}
+          ·{" "}
+          <span
+            className={
+              eligibleForFree
+                ? "font-semibold text-green-700"
+                : "font-semibold text-red-700"
+            }
+          >
+            {eligibleForFree
+              ? "This export is FREE"
+              : "This export will be charged"}
+          </span>
+        </div>
+
 
         {itemIds.length === 0 && (
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -80,6 +107,8 @@ export function PaymentModal({
           onCancel={onClose}
           shopDomain={shopDomain}
           resource={resource}
+          initialCurrency={initialCurrency}
+          initialExchangeRate={initialExchangeRate}
         />
       </div>
     </div>
@@ -93,6 +122,8 @@ function CheckoutWrapper({
   onCancel,
   resource,
   shopDomain,
+  initialCurrency,
+  initialExchangeRate,
 }: {
   price: {
     count: number;
@@ -104,15 +135,18 @@ function CheckoutWrapper({
   onCancel: () => void;
   shopDomain: string;
   resource: string;
+  initialCurrency?: PaymentCurrency;
+  initialExchangeRate?: number;
 }) {
   const [coupon, setCoupon] = useState("");
   const [, setCouponId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [finalAmount, setFinalAmount] = useState(price.total);
   const [discount, setDiscount] = useState(0);
-  const [paymentCurrency, setPaymentCurrency] =
-    useState<PaymentCurrency>("USD");
-  const [exchangeRate, setExchangeRate] = useState(83);
+  const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>(
+    initialCurrency ?? "USD",
+  );
+  const [exchangeRate, setExchangeRate] = useState(initialExchangeRate ?? 83);
   const [couponStatus, setCouponStatus] = useState<
     "idle" | "checking" | "valid" | "invalid" | "used"
   >("idle");
@@ -123,16 +157,11 @@ function CheckoutWrapper({
     paymentCurrency,
     exchangeRate,
   );
-  const billedAmount =
-    finalAmount > 0 && finalAmount < minimumCharge
-      ? minimumCharge
-      : finalAmount;
-  const displayBilledAmount = formatExportTotal(
-    billedAmount,
-    paymentCurrency,
-    exchangeRate,
-  );
-  const hasMinimumCharge = finalAmount > 0 && finalAmount < minimumCharge;
+  // A 100%-off coupon means FREE (charge $0) — show $0, not the $1 floor.
+  // The $1 processor minimum applies only to a genuine undersized PAID total.
+  const isFreeViaCoupon = discount >= 100;
+  const hasMinimumCharge =
+    !isFreeViaCoupon && finalAmount > 0 && finalAmount < minimumCharge;
   const canStartPayment =
     itemIds.length > 0 && Boolean(shopDomain) && Boolean(normalizedResource);
 
@@ -369,7 +398,7 @@ function CheckoutWrapper({
 
       <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
         <div className="flex justify-between">
-          <span>Original</span>
+          <span>Total</span>
           <span>{originalTotal}</span>
         </div>
 
@@ -379,11 +408,6 @@ function CheckoutWrapper({
             <span>-{discount}%</span>
           </div>
         )}
-
-        <div className="flex justify-between font-semibold border-t pt-1">
-          <span>Total</span>
-          <span>{displayBilledAmount}</span>
-        </div>
 
         {hasMinimumCharge && (
           <p className="text-xs text-amber-600">
@@ -408,7 +432,11 @@ function CheckoutWrapper({
           disabled={loading || couponStatus === "checking" || !canStartPayment}
           className="flex-1 rounded-sm bg-blue-600 px-3 py-1.5 text-sm text-white"
         >
-          {loading ? "Creating Order..." : "Complete Order"}
+          {loading
+            ? "Creating Order..."
+            : isFreeViaCoupon
+              ? "Download Free"
+              : "Complete Order"}
         </button>
       </div>
     </div>
