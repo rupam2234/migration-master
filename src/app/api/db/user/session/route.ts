@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         //     [sessionId, user.id, expiresAt]
         // );
 
-        // we store in redis instead
+        // we keep the session in redis
         await redisClient.set(`session:${sessionId}`, JSON.stringify({ userId: user.id }), { EX: 60 * 60 })
 
         cookies().set("session", sessionId, {

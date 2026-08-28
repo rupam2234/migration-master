@@ -299,6 +299,8 @@ function CheckoutWrapper({
       setPaymentCurrency(checkoutCurrency);
       setExchangeRate(Number(data.exchangeRate ?? 83));
 
+      console.log(data.currency);
+
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY,
 
@@ -321,19 +323,21 @@ function CheckoutWrapper({
                     },
                   }
                 : {
-                    cards_only: {
-                      name: "Cards",
+                    preferred_methods: {
+                      name: "Other Payment Methods",
                       instruments: [
                         {
                           method: "card",
                         },
+                        {
+                          method: "paypal",
+                        },
                       ],
                     },
                   },
-            sequence:
-              checkoutCurrency === "INR"
-                ? ["block.preferred_methods"]
-                : ["block.cards_only"],
+
+            sequence: ["block.preferred_methods"],
+
             preferences: {
               show_default_blocks: checkoutCurrency === "INR",
             },
