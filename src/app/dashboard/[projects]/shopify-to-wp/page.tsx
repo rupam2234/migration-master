@@ -11,6 +11,7 @@ import {
   ResourceKey,
   ResourceTypes,
 } from "@/lib/sharedResources";
+import { cachedData } from "@/lib/cache";
 
 export default function ShopifyToWpDashboard() {
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
@@ -29,27 +30,41 @@ export default function ShopifyToWpDashboard() {
     }));
 
     try {
-      const resourceValue = ResourceTypes[type];
-      const endpoint = post_id
-        ? `/api/shopify/${resourceValue}/fetch?shop=${encodeURIComponent(
-            activeProject,
-          )}&blogId=${encodeURIComponent(post_id)}`
-        : `/api/shopify/${resourceValue}/fetch?shop=${encodeURIComponent(
-            activeProject,
-          )}`;
+      const { response: items } = await cachedData<
+        any[],
+        [string, ResourceKey]
+      >({
+        fn: async () => {
+          const resourceValue = ResourceTypes[type];
+          const endpoint = post_id
+            ? `/api/shopify/${resourceValue}/fetch?shop=${encodeURIComponent(
+                activeProject,
+              )}&blogId=${encodeURIComponent(post_id)}`
+            : `/api/shopify/${resourceValue}/fetch?shop=${encodeURIComponent(
+                activeProject,
+              )}`;
 
-      const res = await fetch(endpoint);
+          const res = await fetch(endpoint);
 
-      if (!res.ok) {
-        const error = await res.json().catch(() => null);
-        throw new Error(error?.message || `Failed to fetch ${resourceValue}`);
-      }
+          if (!res.ok) {
+            const error = await res.json().catch(() => null);
+            throw new Error(
+              error?.message || `Failed to fetch ${resourceValue}`,
+            );
+          }
 
-      const data = await res.json();
+          return res.json() as Promise<any[]>;
+        },
+        key: `shopif_asset_cache:${activeProject}-${type}`,
+        session_Storage: true,
+        ttl: 10 * 60 * 1000,
+        args: [activeProject, type],
+        useCache: true,
+      });
 
       setShopifyData((prev) => ({
         ...prev,
-        [type]: data,
+        [type]: items,
       }));
     } catch (error) {
       const message =

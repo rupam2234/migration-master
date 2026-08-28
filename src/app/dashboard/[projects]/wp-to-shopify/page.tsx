@@ -22,7 +22,13 @@ import {
   UsersIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ElementType, ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  ElementType,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { cachedData, cleanExpiredCache } from "@/lib/cache";
 
 const WORDPRESS_RESOURCE_CONFIG: Record<WordPressResource, WordPressService> = {
@@ -91,7 +97,11 @@ const WORDPRESS_RESOURCE_CONFIG: Record<WordPressResource, WordPressService> = {
   },
 };
 
-type ConnectionStatusTag = "Checking..." | "Connected" | "Pending" | "Not Connected";
+type ConnectionStatusTag =
+  | "Checking..."
+  | "Connected"
+  | "Pending"
+  | "Not Connected";
 
 const CONNECTION_STATUS_STYLES: Record<ConnectionStatusTag, string> = {
   "Checking...": "text-primary/60",
@@ -219,9 +229,7 @@ export default function WpToShopifyDashboard() {
       if (!timer) timer = setInterval(checkShopifyConnection, 5000);
     };
     const onVisibility = () =>
-      document.visibilityState === "visible"
-        ? start()
-        : stop();
+      document.visibilityState === "visible" ? start() : stop();
 
     start();
     window.addEventListener("focus", checkShopifyConnection);
@@ -301,8 +309,6 @@ export default function WpToShopifyDashboard() {
         ...prev,
         [resource]: items,
       }));
-
-      console.log(items);
 
       return false;
     } catch (error) {

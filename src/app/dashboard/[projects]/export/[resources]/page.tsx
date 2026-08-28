@@ -13,7 +13,7 @@ import { useParams } from "next/navigation";
 import { WPimportProps } from "@/app/api/wordpress/[resources]/import/route";
 import JSZip from "jszip";
 import { PaymentModal } from "@/components/theme/paymentModal";
-import { ItemPreview, ToolTip } from "@/components";
+import { GlobalLoader, ItemPreview, ToolTip } from "@/components";
 import { ResourceKey } from "@/lib/sharedResources";
 
 type PaymentData = {
@@ -32,9 +32,9 @@ const CELL_TRUNCATE_LENGTH = 60;
 
 export default function ExportResources() {
   const params = useParams();
-  const { shopifyData, wpImportSettings, activeProject } = useProjectContext();
+  const { wpImportSettings, activeProject } = useProjectContext();
   const key = (params.resources as string).toUpperCase() as ResourceKey;
-  const selectedData = shopifyData[key];
+
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [page, setPage] = useState(0);
@@ -49,6 +49,25 @@ export default function ExportResources() {
     freeDownloadsLimit: number;
     eligibleForFree: boolean;
   } | null>(null);
+  const [selectedData, setSelectedData] = useState<any>();
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!activeProject || !key) return;
+
+    const cachedData = sessionStorage.getItem(
+      `shopif_asset_cache:${activeProject}-${key}`,
+    );
+
+    if (cachedData) {
+      setSelectedData(JSON.parse(cachedData).data);
+    } else {
+      setInitialLoading(true);
+      return;
+    }
+
+    setInitialLoading(false); // stop the loading animation
+  }, [activeProject, key]);
 
   const records = useMemo(() => {
     if (!selectedData) return [];
@@ -200,12 +219,16 @@ export default function ExportResources() {
     return () => clearTimeout(timer);
   };
 
+  if (initialLoading && !selectedData) {
+    return <GlobalLoader />;
+  }
+
   if (!activeProject)
     return (
       <div className="p-8 text-center text-gray-500">No project selected!</div>
     );
 
-  if (!selectedData) {
+  if (!selectedData && !initialLoading) {
     return (
       <div className="p-8 text-center text-gray-500">
         No data found for &quot;{params.resources as string}&quot;.
