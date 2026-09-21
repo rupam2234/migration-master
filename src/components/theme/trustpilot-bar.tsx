@@ -67,8 +67,9 @@ const TrustpilotBar = ({ initial }: TrustpilotBarProps) => {
   } | null>(isUsable(initial) ? { rating: initial.rating, count: initial.count } : null);
 
   useEffect(() => {
-    // Server already delivered valid data — no need for a client round-trip.
-    if (isUsable(initial)) return;
+    // Server already answered (valid data OR a definite 0/0 "unavailable")
+    // — a client round-trip would just get the same answer again.
+    if (initial) return;
 
     let cancelled = false;
     fetch("/api/trustpilot")

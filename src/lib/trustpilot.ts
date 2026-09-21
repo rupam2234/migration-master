@@ -1,18 +1,16 @@
+import { unstable_cache } from "next/cache";
+
 const API_KEY = process.env.TRUSTPILOT_API_KEY;
 const BUSINESS_UNIT_ID = process.env.TRUSTPILOT_BUSINESS_UNIT_ID;
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const REVALIDATE_SECONDS = 6 * 60 * 60; // 6h — reviews change at human speed
 
 export interface TrustpilotStats {
   rating: number;
   count: number;
 }
 
-interface TrustStats extends TrustpilotStats {
-  fetchedAt: number;
-}
-
-// In-memory cache shared by the /api/trustpilot route and server rendering.
-let cache: TrustStats | null = null;
+// Last successfully-parsed values, used as stale-on-error fallback.
+let lastGood: TrustpilotStats | null = null;
 
 // Defensively read the trustScore / review count from the Business Unit
 // response, which can come back in a couple of shapes.
@@ -33,6 +31,38 @@ function parseStats(json: any): TrustpilotStats | null {
   return { rating, count };
 }
 
+async function fetchTrustpilot(): Promise<TrustpilotStats> {
+  const url = `https://api.trustpilot.com/v1/public/business-units/${BUSINESS_UNIT_ID}?apikey=${encodeURIComponent(API_KEY!)}`;
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "migration-master/1.0",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Trustpilot API responded ${res.status}`);
+  }
+
+  const parsed = parseStats(await res.json());
+  if (!parsed) {
+    throw new Error("No trustScore/reviewCount in API response");
+  }
+
+  lastGood = {
+    rating: Math.round(parsed.rating * 10) / 10,
+    count: parsed.count,
+  };
+  return lastGood;
+}
+
+// Next's persistent data cache: survives across serverless instances and
+// deploys (unlike in-memory caches), so Trustpilot is hit at most once per 6h.
+const getCachedTrustpilot = unstable_cache(
+  fetchTrustpilot,
+  ["trustpilot-stats"],
+  { revalidate: REVALIDATE_SECONDS, tags: ["trustpilot"] },
+);
+
 /**
  * Returns Trustpilot rating/review count, or { rating: 0, count: 0 } when
  * the API is not configured or unreachable. Callers treat 0/0 as "use
@@ -44,42 +74,11 @@ export async function getTrustpilotStats(): Promise<TrustpilotStats> {
     return { rating: 0, count: 0 };
   }
 
-  // Serve fresh cache without hitting Trustpilot again.
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return { rating: cache.rating, count: cache.count };
-  }
-
   try {
-    const url = `https://api.trustpilot.com/v1/public/business-units/${BUSINESS_UNIT_ID}?apikey=${encodeURIComponent(API_KEY)}`;
-    const res = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "migration-master/1.0",
-      },
-      // Never fetch more often than the in-memory TTL anyway.
-      next: { revalidate: CACHE_TTL_MS / 1000 },
-    });
-    if (!res.ok) {
-      throw new Error(`Trustpilot API responded ${res.status}`);
-    }
-
-    const parsed = parseStats(await res.json());
-    if (!parsed) {
-      throw new Error("No trustScore/reviewCount in API response");
-    }
-
-    cache = {
-      rating: Math.round(parsed.rating * 10) / 10,
-      count: parsed.count,
-      fetchedAt: Date.now(),
-    };
-    return { rating: cache.rating, count: cache.count };
+    return await getCachedTrustpilot();
   } catch (error) {
     console.error("Failed to fetch Trustpilot stats", error);
     // Stale-but-real data beats an error; otherwise clean zeros.
-    if (cache) {
-      return { rating: cache.rating, count: cache.count };
-    }
-    return { rating: 0, count: 0 };
+    return lastGood ?? { rating: 0, count: 0 };
   }
 }

@@ -2,7 +2,7 @@ import crypto from "crypto";
 
 const MASTER_KEY = process.env.MASTER_ENCRYPTION_KEY;
 
-const isMasterkeyValid = (master_key) => {
+const isMasterkeyValid = (master_key: string): Buffer => {
   if (!master_key) {
     throw new Error("MASTER_ENCRYPTION_KEY is not set");
   }
@@ -18,15 +18,11 @@ const isMasterkeyValid = (master_key) => {
   return buf;
 };
 
-export function encryptToken(token) {
-  const validMasterKey = isMasterkeyValid(MASTER_KEY);
+export function encryptToken(token: string): Buffer {
+  const key = isMasterkeyValid(MASTER_KEY!);
 
   const iv = crypto.randomBytes(12);
-  const cypher = crypto.createCipheriv(
-    "aes-256-gcm",
-    Buffer.from(validMasterKey, "hex"),
-    iv,
-  );
+  const cypher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const encrypted = Buffer.concat([
     cypher.update(token, "utf-8"),
     cypher.final(),
@@ -35,17 +31,13 @@ export function encryptToken(token) {
   return Buffer.concat([iv, authTag, encrypted]);
 }
 
-export function decryptToken(buffer) {
-  const validMasterKey = isMasterkeyValid(MASTER_KEY);
+export function decryptToken(buffer: Buffer): string {
+  const key = isMasterkeyValid(MASTER_KEY!);
 
   const iv = buffer.subarray(0, 12);
   const authTag = buffer.subarray(12, 28);
   const encrypted = buffer.subarray(28);
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    Buffer.from(validMasterKey, "hex"),
-    iv,
-  );
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString(
     "utf8",
