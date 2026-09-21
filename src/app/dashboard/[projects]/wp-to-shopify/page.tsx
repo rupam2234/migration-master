@@ -137,24 +137,41 @@ export default function WpToShopifyDashboard() {
     cleanExpiredCache({ prefix: "wp-cache:", session_Storage: true });
   }, []);
 
-  const checkWordPressConnection = useCallback(async () => {
+  const WP_STATUS_TTL = 30 * 1000;
+  const SHOPIFY_CONNECTION_TTL = 30 * 1000;
+
+  const checkWordPressConnection = useCallback(async (force = false) => {
     if (!activeProject || !isSuitableProject) return;
 
     setWpChecking(true);
 
     try {
-      const res = await fetch("/api/wordpress/wordpress-connector/status", {
-        headers: {
-          "x-site": activeProject,
-          "Content-Type": "Application/json",
+      // Short-lived cache so toggling between services / revisiting the page
+      // doesn't re-hit the status API on every mount. `force` bypasses it.
+      const { response: data } = await cachedData<
+        { source_status?: boolean },
+        [string]
+      >({
+        key: `wp-cache:conn-wp-status:${activeProject}`,
+        fn: async () => {
+          const res = await fetch("/api/wordpress/wordpress-connector/status", {
+            headers: {
+              "x-site": activeProject,
+              "Content-Type": "Application/json",
+            },
+          });
+
+          if (!res.ok) {
+            throw new Error("Failed to verify WordPress connection");
+          }
+
+          return res.json() as Promise<{ source_status?: boolean }>;
         },
+        args: [activeProject],
+        session_Storage: true,
+        ttl: WP_STATUS_TTL,
+        useCache: !force,
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to verify WordPress connection");
-      }
-
-      const data: { source_status?: boolean } = await res.json();
 
       setWpStatus(data.source_status === true ? "Connected" : "Not Connected");
     } catch (error) {
@@ -165,23 +182,35 @@ export default function WpToShopifyDashboard() {
     }
   }, [activeProject, isSuitableProject]);
 
-  const checkShopifyConnection = useCallback(async () => {
+  const checkShopifyConnection = useCallback(async (force = false) => {
     if (!activeProject || !isSuitableProject) return;
 
     setShopifyChecking(true);
 
     try {
-      const res = await fetch(
-        `/api/shopify/import-connection?project=${encodeURIComponent(
-          activeProject,
-        )}`,
-      );
+      const { response: data } = await cachedData<
+        ShopifyImportConnection,
+        [string]
+      >({
+        key: `wp-cache:conn-shopify:${activeProject}`,
+        fn: async () => {
+          const res = await fetch(
+            `/api/shopify/import-connection?project=${encodeURIComponent(
+              activeProject,
+            )}`,
+          );
 
-      if (!res.ok) {
-        throw new Error("Failed to load the Shopify destination");
-      }
+          if (!res.ok) {
+            throw new Error("Failed to load the Shopify destination");
+          }
 
-      const data: ShopifyImportConnection = await res.json();
+          return res.json() as Promise<ShopifyImportConnection>;
+        },
+        args: [activeProject],
+        session_Storage: true,
+        ttl: SHOPIFY_CONNECTION_TTL,
+        useCache: !force,
+      });
 
       setShopifyConnection(data);
 
@@ -210,12 +239,19 @@ export default function WpToShopifyDashboard() {
 
   // Live hand-off detection: the merchant completes Shopify OAuth in another
   // tab (the Connect link opens target="_blank"), so nothing pushes the flip
-  // back to this dashboard — poll while pending and refresh on window focus
-  // / tab visibility instead of requiring a manual reload.
+  // back to this dashboard — poll only while actually pending, and force a
+  // fresh (cache-bypassing) check on window focus instead of requiring a
+  // manual reload.
   useEffect(() => {
-    if (!activeProject || !isSuitableProject || shopifyStatus === "Connected") {
+    if (
+      !activeProject ||
+      !isSuitableProject ||
+      shopifyStatus === "Connected"
+    ) {
       return;
     }
+
+    const pollFresh = () => checkShopifyConnection(true);
 
     let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -226,21 +262,31 @@ export default function WpToShopifyDashboard() {
       }
     };
     const start = () => {
-      if (!timer) timer = setInterval(checkShopifyConnection, 5000);
+      if (!timer) timer = setInterval(pollFresh, 5000);
     };
     const onVisibility = () =>
       document.visibilityState === "visible" ? start() : stop();
 
-    start();
-    window.addEventListener("focus", checkShopifyConnection);
+    // Only poll while OAuth is actually in-flight ("Pending"); a plain
+    // "Not Connected" destination would otherwise hit the API every 5s forever.
+    if (shopifyStatus === "Pending") {
+      start();
+    }
+
+    window.addEventListener("focus", pollFresh);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       stop();
-      window.removeEventListener("focus", checkShopifyConnection);
+      window.removeEventListener("focus", pollFresh);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [activeProject, isSuitableProject, shopifyStatus, checkShopifyConnection]);
+  }, [
+    activeProject,
+    isSuitableProject,
+    shopifyStatus,
+    checkShopifyConnection,
+  ]);
 
   if (!activeProject) {
     return (

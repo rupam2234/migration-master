@@ -38,7 +38,7 @@ export function DashboardShell({
     typeof params.projects === "string"
       ? decodeURIComponent(params.projects)
       : activeProject;
-  const breadcrumbItems = pathname.split("/").filter(Boolean).slice(0, 3);
+  const pathAfterProject = pathname.split("/").filter(Boolean).slice(3); // /dashboard/{project}/... -> segments after the project
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -143,62 +143,52 @@ export function DashboardShell({
         className={`${sidebarWidth} space-y-14 flex flex-col justify-between border-r border-primary/10 p-5 transition-all duration-200`}
       >
         <div className="flex flex-col gap-8">
-          <SelectProject isCollapsed={drawerClosed} />
           <DashboardNavigation navItems={navItems} collapsed={drawerClosed} />
         </div>
         <DashboardFooter collapsed={drawerClosed} />
       </div>
       <div className="w-full overflow-y-auto">
-        <div className="flex gap-4 h-16 w-full items-center justify-between border-b border-primary/10 px-3">
-          <nav className="text-sm text-primary/60 flex items-center gap-1">
-            <Link href="/dashboard" className="hover:underline hidden md:block">
-              Dashboard
-            </Link>
+        <div className="flex h-16 w-full items-center justify-between gap-4 border-b border-primary/10 px-3">
+          <nav className="flex min-w-0 items-center gap-1 text-sm text-primary/60">
+            <SelectProject />
 
-            {routeProject && (
+            {routeProject ? (
               <>
-                <span className="hidden md:block">/</span>
-
-                {/* Mobile */}
-                <Link
-                  href={getDashboardProjectPath(
-                    routeProject,
-                    SHOPIFY_TO_WP_PATH,
-                  )}
-                  className="hover:underline"
-                >
-                  <span className="md:hidden">
-                    {routeProject.split(".myshopify")[0]}
+                {pathAfterProject.map((segment, index) => (
+                  <span
+                    key={segment}
+                    className="flex min-w-0 items-center gap-1"
+                  >
+                    <span className="text-primary/30">/</span>
+                    <span className="truncate lowercase">
+                      {segment.replaceAll("-", " ")}
+                    </span>
+                    {index === pathAfterProject.length - 1 && (
+                      <Link
+                        href="/dashboard"
+                        className="ml-2 shrink-0 text-xs hover:underline"
+                      >
+                        All projects
+                      </Link>
+                    )}
                   </span>
-
-                  {/* Desktop */}
-                  <span className="hidden md:inline">
-                    {breadcrumbItems.slice(1).map((item, index) => (
-                      <span key={item}>
-                        {index > 0 && " / "}
-                        {index === 0
-                          ? item
-                          : item.includes(".myshopify")
-                            ? item
-                            : item.replaceAll("-", " ")}
-                      </span>
-                    ))}
-                  </span>
-                </Link>
+                ))}
               </>
+            ) : (
+              <span className="truncate">Dashboard</span>
             )}
           </nav>
 
           {/* Right side: add button, profile icon, user name */}
           <div className="flex items-center gap-4">
-            <button
+            {/* <button
               onClick={() => {
                 router.push("/dashboard/new-project");
               }}
               className="px-2 py-1 text-xs border hover:bg-primary/10 border-primary/20 rounded-sm"
             >
               + Add a new project
-            </button>
+            </button> */}
             {/* Profile icon with dropdown */}
             <div
               className="relative"

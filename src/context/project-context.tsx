@@ -53,7 +53,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    // Starting a fresh session: clear all cached data when the project changes.
     setShopifyData({});
+    setWordPressData({
+      posts: [],
+      categories: [],
+      coupons: [],
+      customers: [],
+      media: [],
+      orders: [],
+      pages: [],
+      products: [],
+    });
   }, [activeProject]);
 
   return (
