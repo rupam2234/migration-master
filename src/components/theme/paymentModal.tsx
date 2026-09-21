@@ -182,10 +182,6 @@ function CheckoutWrapper({
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
 
-    script.onload = () => {
-      console.log("Razorpay loaded");
-    };
-
     document.body.appendChild(script);
 
     return () => {
@@ -298,8 +294,6 @@ function CheckoutWrapper({
         data.currency === "INR" ? "INR" : "USD";
       setPaymentCurrency(checkoutCurrency);
       setExchangeRate(Number(data.exchangeRate ?? 83));
-
-      console.log(data.currency);
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY,

@@ -21,8 +21,12 @@ import {
   Ticket,
 } from "lucide-react";
 import styles from "./style.module.css";
-import TransferStatsBadge from "@/components/theme/TransferStatsBadge";
-import TrustpilotBar from "@/components/theme/trustpilot-bar";
+import TransferStatsBadge, {
+  type SiteStats,
+} from "@/components/theme/TransferStatsBadge";
+import TrustpilotBar, {
+  type TrustpilotStats,
+} from "@/components/theme/trustpilot-bar";
 import { Container, Footer, Header } from "@/components";
 import { calculateTieredPrice, TIERED_PRICING } from "@/lib/pricing/tiered";
 
@@ -222,7 +226,14 @@ function routeIsLive(from: string, to: string) {
   return ROUTES.some((r) => r.from === from && r.to === to && r.live);
 }
 
-export default function Main() {
+interface MainProps {
+  /** Server-fetched Trustpilot stats; when present the badge skips its client fetch. */
+  trustpilot?: TrustpilotStats;
+  /** Server-fetched site stats; when present the badge skips its client fetch. */
+  stats?: SiteStats;
+}
+
+export default function Main({ trustpilot, stats }: MainProps) {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [itemCount, setItemCount] = useState(0);
   const [fromId, setFromId] = useState("shopify");
@@ -243,7 +254,7 @@ export default function Main() {
       <Header nav items={NAV_ITEMS} />
 
       <Container>
-        <TrustpilotBar />
+        <TrustpilotBar initial={trustpilot} />
 
         <section className={`${styles["mm-shell"]} ${styles["mm-hero"]}`}>
           <div>
@@ -394,7 +405,7 @@ export default function Main() {
                 Built for reliable migrations
               </h2>
               <div className="hidden md:block">
-                <TransferStatsBadge />
+                <TransferStatsBadge initial={stats} />
               </div>
             </div>
 

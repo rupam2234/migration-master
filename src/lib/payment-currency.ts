@@ -1,5 +1,5 @@
 import { pool, refreshShopifyAccessToken } from "./index";
-import { fetchLiveUsdToInrRate, type PaymentCurrency } from "./pricing";
+import { fetchLiveUsdToInrRate, USD_TO_INR_FALLBACK_RATE, type PaymentCurrency } from "./pricing";
 
 const API_VERSION = "2026-01";
 
@@ -142,6 +142,6 @@ export async function getUsdToInrRate(
         return await fetchLiveUsdToInrRate();
     } catch (error) {
         console.warn("Falling back to static USD/INR rate", error);
-        return 83;
+        return USD_TO_INR_FALLBACK_RATE;
     }
 }

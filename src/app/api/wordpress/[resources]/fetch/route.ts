@@ -1,4 +1,4 @@
-import { getCurrentUser, MMC_RESOURCES, pool, WOO_RESOURCES, WordPressResource } from "@/lib";
+import { fetchAllPages, MMC_RESOURCES, pool, requireUser, WOO_RESOURCES, WordPressResource } from "@/lib";
 import { NextRequest, NextResponse } from "next/server";
 
 type MmcPagination = { page: number; per_page: number; total: number; total_pages?: number };
@@ -10,10 +10,8 @@ export async function GET(req: NextRequest) {
     const projectName = req.headers.get("x-projectName");
     const resource = req.headers.get("asset") as WordPressResource;
 
-    const user = await getCurrentUser();
-    if (!user) {
-        return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
+    const { user, error } = await requireUser();
+    if (error) return error;
 
     if (!resource) {
         return NextResponse.json({ message: "Missing resource type" }, { status: 400 });
@@ -82,10 +80,6 @@ export async function GET(req: NextRequest) {
 async function fetchItems(resource: WordPressResource, domain: string, ITEM_PER_PAGE: number = 50, token: string) {
     if (!resource || !domain) return null;
 
-    let page_no = 1;
-    let all_items: any[] = [];
-    let totalPages = 1;
-
     const buildUrl = (page: number): string => {
         const base = `https://${domain}/wp-json`;
         switch (resource) {
@@ -101,8 +95,8 @@ async function fetchItems(resource: WordPressResource, domain: string, ITEM_PER_
     };
 
     try {
-        do {
-            const res = await fetch(buildUrl(page_no), {
+        return await fetchAllPages<any>(async (page) => {
+            const res = await fetch(buildUrl(page), {
                 headers: { "X-Migration-Master-Token": token },
             });
 
@@ -111,14 +105,13 @@ async function fetchItems(resource: WordPressResource, domain: string, ITEM_PER_
             }
 
             const data: MmcListResponse<any> = await res.json();
-            all_items = all_items.concat(data.items);
-            totalPages = data.pagination?.total_pages ?? 1;
-            page_no++;
-        } while (page_no <= totalPages);
-
-        return all_items;
+            return {
+                items: data.items,
+                totalPages: data.pagination?.total_pages ?? 1,
+            };
+        });
     } catch (error: any) {
-        console.log(error.message);
+        console.error(error.message);
         return null;
     }
 }
@@ -130,15 +123,11 @@ async function fetchWooItems(
     consumerKey: string,
     consumerSecret: string,
 ) {
-    let page_no = 1;
-    let all_items: any[] = [];
-    let totalPages = 1;
-
     const basicAuth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
 
     try {
-        do {
-            const url = `https://${domain}/wp-json/wc/v3/${resource}?page=${page_no}&per_page=${ITEM_PER_PAGE}`;
+        return await fetchAllPages<any>(async (page) => {
+            const url = `https://${domain}/wp-json/wc/v3/${resource}?page=${page}&per_page=${ITEM_PER_PAGE}`;
             const res = await fetch(url, {
                 headers: { Authorization: `Basic ${basicAuth}` },
             });
@@ -147,15 +136,15 @@ async function fetchWooItems(
                 throw new Error(`Request failed: ${res.status} ${res.statusText}`);
             }
 
-            const items = await res.json(); // Woo returns a bare array, not { items, pagination }
-            all_items = all_items.concat(items);
-            totalPages = Number(res.headers.get("X-WP-TotalPages")) || 1;
-            page_no++;
-        } while (page_no <= totalPages);
-
-        return all_items;
+            // Woo returns a bare array, not { items, pagination }
+            const items = await res.json();
+            return {
+                items,
+                totalPages: Number(res.headers.get("X-WP-TotalPages")) || 1,
+            };
+        });
     } catch (error: any) {
-        console.log(error.message);
+        console.error(error.message);
         return null;
     }
 }

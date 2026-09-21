@@ -1,16 +1,10 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, pool } from "@/lib";
+import { pool, requireUser } from "@/lib";
 
 export async function GET(req: NextRequest) {
-    const user = await getCurrentUser();
-
-    if (!user) {
-        return NextResponse.json(
-            { message: "Unauthorized" },
-            { status: 401 },
-        );
-    }
+    const { user, error } = await requireUser();
+    if (error) return error;
 
     const shop = req.nextUrl.searchParams.get("shop");
 

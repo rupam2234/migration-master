@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     try {
         const result = await pool.query(
-            `SELECT id, password_hash FROM users WHERE email = $1`,
+            `SELECT id, name, email, password_hash FROM users WHERE email = $1`,
             [email]
         );
 
@@ -32,13 +32,13 @@ export async function POST(request: Request) {
             return Response.json({ message: "Invalid email or password" }, { status: 401 });
         }
 
-        // await pool.query(
-        //     `INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)`,
-        //     [sessionId, user.id, expiresAt]
-        // );
-
-        // we keep the session in redis
-        await redisClient.set(`session:${sessionId}`, JSON.stringify({ userId: user.id }), { EX: 60 * 60 })
+        // we keep the session (incl. the user object) in redis, so
+        // getCurrentUser() never needs a Postgres roundtrip
+        await redisClient.set(
+            `session:${sessionId}`,
+            JSON.stringify({ userId: user.id, name: user.name, email: user.email }),
+            { EX: 60 * 60 }
+        )
 
         cookies().set("session", sessionId, {
             httpOnly: true,

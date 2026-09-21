@@ -1,4 +1,4 @@
-import { getCurrentUser, pool } from "@/lib";
+import { pool, requireUser } from "@/lib";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -11,13 +11,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json(
-      { message: "Unauthorized" },
-      { status: 401 }
-    );
-  }
+  const { user, error } = await requireUser();
+  if (error) return error;
 
   try {
     const result = await pool.query(

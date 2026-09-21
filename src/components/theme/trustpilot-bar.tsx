@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import styles from "@/app/(home)/style.module.css";
 
+export interface TrustpilotStats {
+  rating: number;
+  count: number;
+}
+
 /* -------------------------------------------------------------------------
  * Display values shown until live Trustpilot data (from /api/trustpilot,
  * via the official Business Units API) arrives. Update these to match your
@@ -44,24 +49,32 @@ function TrustStar({ fill }: { fill: number }) {
   );
 }
 
-const TrustpilotBar = () => {
+interface TrustpilotBarProps {
+  /** Server-fetched stats (home page ISR). When valid, the client fetch is skipped. */
+  initial?: TrustpilotStats;
+}
+
+const TrustpilotBar = ({ initial }: TrustpilotBarProps) => {
+  const isUsable = (data?: TrustpilotStats | null): data is TrustpilotStats =>
+    typeof data?.rating === "number" &&
+    typeof data?.count === "number" &&
+    data.rating > 0 &&
+    data.count > 0;
+
   const [live, setLive] = useState<{
     rating: number;
     count: number;
-  } | null>(null);
+  } | null>(isUsable(initial) ? { rating: initial.rating, count: initial.count } : null);
 
   useEffect(() => {
+    // Server already delivered valid data — no need for a client round-trip.
+    if (isUsable(initial)) return;
+
     let cancelled = false;
     fetch("/api/trustpilot")
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
       .then((data) => {
-        if (
-          !cancelled &&
-          typeof data?.rating === "number" &&
-          typeof data?.count === "number" &&
-          data.rating > 0 &&
-          data.count > 0
-        ) {
+        if (!cancelled && isUsable(data)) {
           setLive({ rating: data.rating, count: data.count });
         }
       })
@@ -71,7 +84,7 @@ const TrustpilotBar = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initial]);
 
   // Fallback (SSR / first paint) for the stripe; replaced by live data if valid.
   const rating = Math.round((live?.rating ?? FALLBACK_RATING) * 10) / 10;

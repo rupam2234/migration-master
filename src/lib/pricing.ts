@@ -1,13 +1,21 @@
 
 export const USD_TO_INR_RATE = 92;
 
+/**
+ * Emergency fallback used ONLY when the live-rate fetch fails.
+ * Kept separate from USD_TO_INR_RATE so each stays intentional.
+ */
+export const USD_TO_INR_FALLBACK_RATE = 92;
+
 export type PaymentCurrency = "USD" | "INR";
 
 export async function fetchLiveUsdToInrRate(): Promise<number> {
     const response = await fetch(
         "https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR",
         {
-            cache: "no-store",
+            // FX rates don't change per-request — cache for 1 hour
+            // instead of hitting the external API on every checkout.
+            next: { revalidate: 3600 },
         },
     );
 

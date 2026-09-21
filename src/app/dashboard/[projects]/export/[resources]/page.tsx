@@ -211,12 +211,13 @@ export default function ExportResources() {
       return;
     }
 
-    const timer = setTimeout(async () => {
-      await generateWordpressImport();
-    }, 1500);
-
     setShowPaymentModal(false);
-    return () => clearTimeout(timer);
+
+    // Brief pause to let the verified payment propagate server-side before
+    // the import generation reads it. Awaited (with a promise) instead of a
+    // fire-and-forget setTimeout so errors surface and ordering is guaranteed.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await generateWordpressImport();
   };
 
   if (initialLoading && !selectedData) {

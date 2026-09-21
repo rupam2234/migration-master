@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "@/app/(home)/style.module.css";
 
+export interface SiteStats {
+  projects: number;
+  transfers: number;
+}
+
 function useCountUp(target: number | null, duration = 900) {
   const [value, setValue] = useState(0);
   const frame = useRef<number>();
@@ -27,14 +32,23 @@ function useCountUp(target: number | null, duration = 900) {
 
 type Status = "loading" | "error" | "ready";
 
-export default function TransferStatsBadge() {
-  const [stats, setStats] = useState<{
-    projects: number;
-    transfers: number;
-  } | null>(null);
-  const [status, setStatus] = useState<Status>("loading");
+interface TransferStatsBadgeProps {
+  /** Server-fetched stats (home page ISR). When present, the client fetch is skipped. */
+  initial?: SiteStats;
+}
+
+export default function TransferStatsBadge({
+  initial,
+}: TransferStatsBadgeProps) {
+  const [stats, setStats] = useState<SiteStats | null>(initial ?? null);
+  const [status, setStatus] = useState<Status>(
+    initial ? "ready" : "loading",
+  );
 
   useEffect(() => {
+    // Server already delivered stats — no need for a client round-trip.
+    if (initial) return;
+
     fetch("/api/stats")
       .then((res) => res.json())
       .then((data) => {
@@ -46,7 +60,7 @@ export default function TransferStatsBadge() {
         }
       })
       .catch(() => setStatus("error"));
-  }, []);
+  }, [initial]);
 
   const transfers = useCountUp(stats?.transfers ?? null);
   const projects = useCountUp(stats?.projects ?? null);

@@ -1,5 +1,4 @@
 "use client";
-import CryptoJS from "crypto-js";
 
 const ENC_KEY_STORAGE_KEY = "_enc_session_key";
 const ENC_KEY_EXPIRY_KEY = "_enc_session_ttl";
@@ -60,7 +59,7 @@ export async function cachedData<T, M extends any[] = []>({
                 if (parsed.cryptography && typeof parsed.data === "string") {
                     const encKey = getEncKey();
                     if (encKey) {
-                        parsed.data = JSON.parse(decrypt(parsed.data, encKey));
+                        parsed.data = JSON.parse(await decrypt(parsed.data, encKey));
                     }
                 }
                 if (Date.now() < parsed.expiry) {
@@ -86,7 +85,10 @@ export async function cachedData<T, M extends any[] = []>({
 
     const encKey = useCrypto ? getEncKey() : null;
     const payload: CachePayload<T | string> = {
-        data: useCrypto && encKey ? encrypt(JSON.stringify(response), encKey) : response,
+        data:
+            useCrypto && encKey
+                ? await encrypt(JSON.stringify(response), encKey)
+                : response,
         expiry: Date.now() + ttl,
         cryptography: useCrypto && encKey !== null,
     };
@@ -164,10 +166,12 @@ function getEncKey(): string | null {
         // Ignore storage read error
     }
 
-    // generate a new session key
-    const randomKey = CryptoJS.lib.WordArray.random(32).toString(
-        CryptoJS.enc.Hex,
-    );
+    // generate a new session key (32 random bytes, hex-encoded)
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    const randomKey = Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
 
     try {
         sessionStorage.setItem(ENC_KEY_STORAGE_KEY, randomKey);
@@ -182,11 +186,60 @@ function getEncKey(): string | null {
     return randomKey;
 }
 
-function decrypt(value: string, encKey: string) {
-    return CryptoJS.AES.decrypt(value, encKey).toString(CryptoJS.enc.Utf8);
+/** Import the hex session key as an AES-GCM CryptoKey. */
+async function importEncKey(encKey: string): Promise<CryptoKey> {
+    const raw = new Uint8Array(
+        encKey.match(/.{2}/g)!.map((h) => Number.parseInt(h, 16)),
+    );
+    return crypto.subtle.importKey(
+        "raw",
+        raw,
+        { name: "AES-GCM" },
+        false,
+        ["encrypt", "decrypt"],
+    );
 }
-function encrypt(value: string, encKey: string) {
-    return CryptoJS.AES.encrypt(value, encKey).toString();
+
+/**
+ * AES-GCM encrypt. Output is base64(iv || ciphertext+tag).
+ * Replaces the deprecated crypto-js dependency with the built-in
+ * Web Crypto API (async — callers within cachedData already await).
+ */
+async function encrypt(value: string, encKey: string): Promise<string> {
+    const key = await importEncKey(encKey);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const cipherText = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        new TextEncoder().encode(value),
+    );
+
+    const out = new Uint8Array(iv.length + cipherText.byteLength);
+    out.set(iv);
+    out.set(new Uint8Array(cipherText), iv.length);
+
+    // Chunked base64 conversion — avoids call-stack overflow on large payloads
+    let binary = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < out.length; i += CHUNK) {
+        binary += String.fromCharCode(...Array.from(out.subarray(i, i + CHUNK)));
+    }
+    return btoa(binary);
+}
+
+/** AES-GCM decrypt of base64(iv || ciphertext+tag). Throws on tampered/unreadable data. */
+async function decrypt(value: string, encKey: string): Promise<string> {
+    const key = await importEncKey(encKey);
+    const buf = Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+    const iv = buf.slice(0, 12);
+    const cipherText = buf.slice(12);
+
+    const plain = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        cipherText,
+    );
+    return new TextDecoder().decode(plain);
 }
 
 /** Returns the appropriate Web Storage instance, or a no-op in-memory fallback during SSR. */

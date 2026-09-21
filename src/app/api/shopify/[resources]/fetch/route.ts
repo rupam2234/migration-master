@@ -1,4 +1,5 @@
-import { getCurrentUser, pool, refreshShopifyAccessToken, ShopifyResources, } from "@/lib";
+import { createHash } from "crypto";
+import { pool, refreshShopifyAccessToken, requireUser, ShopifyResources, } from "@/lib";
 import { unstable_cache } from "next/cache";
 import type { ShopifyCoupon } from "@/lib/wxr_generator";
 import { NextRequest, NextResponse } from "next/server";
@@ -620,13 +621,18 @@ async function shopifyGraphQL({
   shopDomain,
   variables,
 }: Props) {
+  // Bounded, semantic cache key: a short digest of query + variables.
+  // (Previously the raw query text + serialized variables — plus the
+  // access token, via unstable_cache's argument serialization — were
+  // embedded verbatim into the cache key.)
+  const argsDigest = createHash("sha256")
+    .update(query)
+    .update(JSON.stringify(variables ?? {}))
+    .digest("hex")
+    .slice(0, 32);
+
   const cachedData = unstable_cache(
-    async (
-      shopDomain: string,
-      accessToken: string,
-      query: string,
-      variables: Record<string, unknown>,
-    ) => {
+    async () => {
       const res = await fetch(
         `https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`,
         {
@@ -661,24 +667,16 @@ async function shopifyGraphQL({
 
       return json;
     },
-    [
-      "store-data",
-      shopDomain,
-      query,
-      JSON.stringify(variables ?? {}),
-    ],
+    // accessToken is intentionally bound in this closure, NOT passed as an
+    // argument — so it never becomes part of the cache key material.
+    [`store-data:${shopDomain}:${argsDigest}`],
     {
       revalidate: REVALIDATE_IN,
       tags: [`store_data_${shopDomain}`],
     },
   );
 
-  return cachedData(
-    shopDomain,
-    accessToken,
-    query,
-    variables ?? {},
-  );
+  return cachedData();
 }
 
 /**
@@ -855,14 +853,8 @@ export async function GET(
   }
 
   try {
-    const user = await getCurrentUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    const { error } = await requireUser();
+    if (error) return error;
 
     const result = await pool.query(
       `

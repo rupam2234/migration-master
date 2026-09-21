@@ -1,16 +1,10 @@
-import { getCurrentUser, pool } from "@/lib";
+import { pool, requireUser } from "@/lib";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    return NextResponse.json(
-      { message: "Unauthorized" },
-      { status: 401 }
-    );
-  }
+  const { user, error } = await requireUser();
+  if (error) return error;
 
   try {
     const { shopDomain } = await req.json();

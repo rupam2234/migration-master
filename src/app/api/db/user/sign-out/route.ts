@@ -18,15 +18,6 @@ export async function POST() {
 
         await redisClient.del(`session:${sessionId}`)
 
-        // if (sessionId) {
-        //     await pool.query(
-        //         `DELETE FROM sessions WHERE id = $1`,
-        //         [sessionId]
-        //     );
-        // }
-
-        // revalidateTag(`session:${sessionId}`); // clear cache configured during session
-
         const response = NextResponse.json(
             { message: "Signed out" },
             { status: 200 }
