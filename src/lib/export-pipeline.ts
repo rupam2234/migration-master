@@ -17,6 +17,7 @@ import { gzipToBase64, gunzipToJson, gunzipToString } from "./compression";
 import pool from "./db";
 import { getSnapshot, itemId, readSnapshotPage } from "./snapshots";
 import { generateWXR, type WXRConfig } from "./wxr_generator";
+import { generateShopifyCsv } from "./shopify-csv";
 import type { ShopifyResources, WordPressResource } from "./sharedResources";
 
 /** Single batch size for uploads + transforms. One job process call = one batch. */
@@ -333,6 +334,8 @@ const SHOPIFY_TO_WP_RESOURCES: ShopifyResources[] = [
 
 const WP_TO_SHOPIFY_RESOURCES: WordPressResource[] = [
   "products",
+  "posts",
+  "categories",
 ];
 
 /**
@@ -350,92 +353,19 @@ export function isSupportedExportResource(
 }
 
 /**
- * Generates a Shopify product-import CSV from a page of WordPress records.
+ * Generates a Shopify import CSV from a page of WordPress records.
  *
- * Shopify expects flat CSVs with one line per variant under a heading row.
- * WordPress products are 1:1 here (no complex variants), so this produces one
- * row per product with `Handle, Title, Body (HTML), Vendor, Type, Tags,
- * Published, Option1 Name, Option1 Value, Variant SKU, Variant Grams,
- * Variant Inventory Qty, Variant Inventory Policy, Variant Price, Image Src`.
- *
- * Records that reference an external image URL (MongoDB's `product_images`
- * array) are carried through `Image Src` so Shopify can attach them on import.
+ * Delegates to the per-resource mappers in `@/lib/shopify-csv`, which map
+ * records onto Shopify's architecture:
+ * - products → native product CSV (incl. `Metafield:` columns and tags)
+ * - posts → blog-post CSV (Matrixify-compatible)
+ * - categories → collections CSV (Matrixify-compatible)
  */
-export function generateShopifyCSV(resource: WordPressResource, items: any[]): string {
-  if (resource !== "products") {
-    throw new Error("Shopify CSV export is only supported for products right now");
-  }
-
-  const headers = [
-    "Handle",
-    "Title",
-    "Body (HTML)",
-    "Vendor",
-    "Type",
-    "Tags",
-    "Published",
-    "Option1 Name",
-    "Option1 Value",
-    "Variant SKU",
-    "Variant Grams",
-    "Variant Inventory Qty",
-    "Variant Inventory Policy",
-    "Variant Price",
-    "Image Src",
-  ];
-
-  const escapeCsv = (value: unknown, quoted = false): string => {
-    const raw = value == null ? "" : String(value);
-    if (quoted) {
-      return `"${raw.replace(/"/g, '""')}"`;
-    }
-    return raw.includes(",") || raw.includes('"') || raw.includes("\n")
-      ? `"${raw.replace(/"/g, '""')}"`
-      : raw;
-  };
-
-  const rows: string[][] = [headers];
-
-  for (const product of items) {
-    const tags: string[] = [];
-
-    if (Array.isArray(product.tags)) {
-      product.tags.forEach((t: any) => tags.push(typeof t === "string" ? t : String(t)));
-    } else if (typeof product.tags === "string") {
-      tags.push(product.tags);
-    }
-
-    // WXR used `featured_image` + `images[]`; the Shopify CSV uses
-    // `Image Src` on every row and Shopify fills the product image from it.
-    const imageSrc = product.featured_image
-      ? product.featured_image.replace(/\/adapt\/.*$/, "")
-      : product.images?.[0]?.src
-        ? product.images[0].src.replace(/\/adapt\/.*$/, "")
-        : "";
-
-    rows.push([
-      escapeCsv(product.handle ?? product.id ?? "n/a", true),
-      escapeCsv(product.title ?? "", true),
-      escapeCsv(product.body || product.body_html || "", true),
-      escapeCsv(product.vendor ?? "Unknown", true),
-      escapeCsv(product.type ?? product.product_type ?? "Other", true),
-      escapeCsv(tags.join(", "), true),
-      escapeCsv(product.status === "publish" ? "TRUE" : "FALSE"),
-      escapeCsv("Default Title"),
-      escapeCsv("Default Title"),
-      escapeCsv(product.sku ?? product.invId ?? ""),
-      escapeCsv(product.weight_g ?? product.weight ?? "0"),
-      escapeCsv(product.lazy_stock?.quantity ?? product.qty ?? "0"),
-      escapeCsv(
-        product.lazy_stock?.manage ? "deny" : "continue",
-        true,
-      ),
-      escapeCsv(product.price ?? "0"),
-      escapeCsv(imageSrc, true),
-    ]);
-  }
-
-  return [headers.join(","), ...rows.slice(1).map((r) => r.join(","))].join("\r\n");
+export function generateShopifyCSV(
+  resource: WordPressResource,
+  items: any[],
+): string {
+  return generateShopifyCsv(resource, items);
 }
 
 
