@@ -99,6 +99,28 @@ export const RESOURCE_CONFIG: Record<ResourceKey, Services> = {
 
 export const RESOURCE_KEYS = Object.keys(ResourceTypes) as ResourceKey[];
 
+/**
+ * Resources whose proxy fetch needs a scope value beyond the project itself —
+ * currently only Shopify articles, which are fetched per blog.
+ *
+ * Kept here as the single source of truth so the migration and export screens
+ * agree on when a fetch needs extra context.
+ */
+export const SCOPED_RESOURCES: ResourceKey[] = ["ARTICLES"];
+
+/** True when fetching this resource (key or slug) requires a scope value. */
+export function requiresScope(resource: string): boolean {
+    return SCOPED_RESOURCES.includes(resource.toUpperCase() as ResourceKey);
+}
+
+/**
+ * sessionStorage key holding the scope (blog id) last used for a resource, so
+ * the export screen can target the exact same record set the user fetched.
+ */
+export function scopeStorageKey(project: string, resource: string): string {
+    return `shopif_scope:${project}-${resource.toUpperCase()}`;
+}
+
 export const WordPressResourceTypes = {
     posts: "posts",
     pages: "pages",

@@ -1,7 +1,7 @@
 "use client";
 
 import { ResourceKey } from "@/lib/sharedResources";
-import { ImageIcon, Hash } from "lucide-react";
+import { ChevronDown, Hash, ImageIcon } from "lucide-react";
 
 type Props = {
   item: Record<string, any>;
@@ -28,11 +28,22 @@ const DESCRIPTION_KEYS = [
   "excerpt",
 ];
 
+/**
+ * Record preview panel.
+ *
+ * Renders content only (no outer card / sticky positioning) so the host page
+ * owns the frame and every panel on the export screen shares one border and
+ * radius scale.
+ */
 export default function ItemPreview({ item }: Props) {
   if (!item) {
     return (
-      <div className="rounded-lg border bg-white p-6 text-center text-sm text-gray-400">
-        Select an item
+      <div className="flex flex-col items-center justify-center gap-1.5 px-5 py-14 text-center">
+        <ImageIcon size={20} className="text-primary/20" />
+        <p className="text-sm font-medium text-primary/50">No record selected</p>
+        <p className="text-xs text-primary/35">
+          Hover a row to preview its details.
+        </p>
       </div>
     );
   }
@@ -51,73 +62,91 @@ export default function ItemPreview({ item }: Props) {
     .slice(0, 8);
 
   return (
-    <div className="sticky top-4 overflow-hidden rounded-lg border bg-white">
-      {/* Image */}
+    <div className="flex flex-col">
+      {/* Media */}
 
-      <div className="flex max-h-28 min-h-28 items-center justify-center overflow-hidden bg-gray-100">
+      <div className="flex h-32 items-center justify-center overflow-hidden border-b border-primary/10 bg-primary/[0.03]">
         {image ? (
           <img src={image} alt={title} className="h-full w-full object-cover" />
         ) : (
-          <ImageIcon className="h-8 w-8 text-gray-300" />
+          <ImageIcon size={20} className="text-primary/20" />
         )}
       </div>
 
-      <div className="space-y-4 p-4">
-        {/* Title */}
+      {/* Identity */}
 
-        <div>
-          <h2 className="line-clamp-2 text-sm font-semibold">{title}</h2>
+      <div className="border-b border-primary/10 px-5 py-4">
+        <h2 className="line-clamp-2 text-sm font-semibold text-primary/90">
+          {title}
+        </h2>
 
-          {item.handle && (
-            <p className="mt-1 text-xs text-gray-500">/{item.handle}</p>
-          )}
-        </div>
+        {item.handle && (
+          <p className="mt-1 truncate text-xs text-primary/40">/{item.handle}</p>
+        )}
+      </div>
 
-        {/* Quick info */}
+      {/* Fields */}
 
-        <div className="space-y-2">
+      {fields.length > 0 && (
+        <div className="flex flex-col gap-2.5 border-b border-primary/10 px-5 py-4">
           {fields.map(([key, value]) => (
             <div
               key={key}
-              className="flex items-start justify-between gap-3 text-xs"
+              className="flex items-start justify-between gap-4 text-xs"
             >
-              <span className="text-gray-400 capitalize">{key}</span>
+              <span className="shrink-0 text-primary/45">{humanize(key)}</span>
 
-              <span className="max-w-[60%] truncate text-right font-medium text-gray-700">
+              <span className="max-w-[62%] truncate text-right font-medium text-primary/80">
                 {String(value)}
               </span>
             </div>
           ))}
         </div>
+      )}
 
-        {/* Description */}
+      {/* Description */}
 
-        {description && (
-          <div className="border-t pt-3">
-            <p
-              className="line-clamp-4 text-xs leading-5 text-gray-600"
-              dangerouslySetInnerHTML={{
-                __html: description,
-              }}
-            />
-          </div>
-        )}
+      {description && (
+        <div className="border-b border-primary/10 px-5 py-4">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-primary/40">
+            Description
+          </p>
 
-        {/* JSON */}
+          <p
+            className="line-clamp-4 text-xs leading-5 text-primary/60"
+            dangerouslySetInnerHTML={{
+              __html: description,
+            }}
+          />
+        </div>
+      )}
 
-        <details className="border-t pt-3">
-          <summary className="flex cursor-pointer items-center gap-2 text-xs text-gray-500">
-            <Hash size={14} />
-            Raw JSON
-          </summary>
+      {/* Raw record */}
 
-          <pre className="mt-2 max-h-48 overflow-auto rounded bg-gray-50 p-2 text-[10px]">
-            {JSON.stringify(item, null, 2)}
-          </pre>
-        </details>
-      </div>
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 text-xs font-medium text-primary/50 transition-colors hover:text-primary/80">
+          <Hash size={13} />
+          Raw record
+          <ChevronDown
+            size={13}
+            className="ml-auto transition-transform group-open:rotate-180"
+          />
+        </summary>
+
+        <pre className="mx-5 mb-4 max-h-56 overflow-auto rounded-lg border border-primary/10 bg-primary/[0.03] p-2.5 font-mono text-[10px] leading-4 text-primary/70">
+          {JSON.stringify(item, null, 2)}
+        </pre>
+      </details>
     </div>
   );
+}
+
+/** `body_html` → `Body html` for readable preview labels. */
+function humanize(key: string) {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function findValue(obj: any, keys: string[]) {

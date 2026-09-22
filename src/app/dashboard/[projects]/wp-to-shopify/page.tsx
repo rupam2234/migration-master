@@ -9,7 +9,6 @@ import {
 } from "@/lib/sharedResources";
 import { isShopifyProject } from "@/lib/dashboard-routes";
 import {
-  ArrowRightIcon,
   ExternalLinkIcon,
   FileTextIcon,
   ImageIcon,
@@ -21,15 +20,9 @@ import {
   TriangleAlert,
   UsersIcon,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import {
-  ElementType,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { ElementType, ReactNode, useCallback, useEffect, useState } from "react";
 import { cachedData, cleanExpiredCache } from "@/lib/cache";
+import { AssetCard } from "@/components/asset-card";
 
 const WORDPRESS_RESOURCE_CONFIG: Record<WordPressResource, WordPressService> = {
   posts: {
@@ -126,10 +119,10 @@ export default function WpToShopifyDashboard() {
     useProjectContext();
   const isSuitableProject = !isShopifyProject(activeProject);
   const [wpStatus, setWpStatus] = useState<ConnectionStatusTag>("Checking...");
-  const [wpChecking, setWpChecking] = useState<boolean>(false);
+  const [wpChecking, setWpChecking] = useState<boolean>(true);
   const [shopifyStatus, setShopifyStatus] =
     useState<ConnectionStatusTag>("Checking...");
-  const [shopifyChecking, setShopifyChecking] = useState<boolean>(false);
+  const [shopifyChecking, setShopifyChecking] = useState<boolean>(true);
   const [shopifyConnection, setShopifyConnection] =
     useState<ShopifyImportConnection | null>(null);
 
@@ -356,7 +349,7 @@ export default function WpToShopifyDashboard() {
         [resource]: items,
       }));
 
-      return false;
+      return true;
     } catch (error) {
       console.error("Error fetching data", error);
       return false;
@@ -367,13 +360,11 @@ export default function WpToShopifyDashboard() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">
-            Export WordPress Contents
-          </h2>
-
-          <p className="mt-1 text-sm text-primary/50">
-            Fetch data for each resource type and prepare individual Shopify
-            import ready files.
+          <h1 className="text-base font-semibold tracking-tight text-foreground">
+            WordPress → Shopify
+          </h1>
+          <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+            Choose what to export from your WordPress site.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -448,28 +439,23 @@ export default function WpToShopifyDashboard() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {[...MMC_RESOURCES, ...WOO_RESOURCES].map((assetType) => {
           const type = assetType.toLocaleLowerCase() as WordPressResource;
-
-          const {
-            label,
-            description,
-            icon: Icon,
-            accent,
-          } = WORDPRESS_RESOURCE_CONFIG[type];
+          const config = WORDPRESS_RESOURCE_CONFIG[type];
+          const count = (wordPressData[assetType] as any[]).length;
 
           return (
-            <ResourceCard
+            <WpAssetCard
               key={assetType}
-              accent={accent}
-              icon={Icon}
-              activeProject={activeProject}
               type={assetType}
-              label={label}
-              description={description}
-              count={(wordPressData[assetType] as any[]).length}
-              fetchResourceTrigger={async () => await fetchResource(assetType)}
+              label={config.label}
+              description={config.description}
+              icon={config.icon}
+              accent={config.accent}
+              count={count}
+              activeProject={activeProject}
+              fetchResource={fetchResource}
             />
           );
         })}
@@ -478,94 +464,45 @@ export default function WpToShopifyDashboard() {
   );
 }
 
-function ResourceCard({
-  accent,
-  icon: Icon,
-  activeProject,
+function WpAssetCard({
   type,
-  description,
   label,
+  description,
+  icon: Icon,
+  accent,
   count,
-  fetchResourceTrigger,
+  activeProject,
+  fetchResource,
 }: {
-  accent: string;
-  icon: ElementType;
-  activeProject: string;
   type: WordPressResource;
-  description: string;
   label: string;
+  description: string;
+  icon: ElementType;
+  accent: string;
   count: number;
-  fetchResourceTrigger: () => Promise<boolean>;
+  activeProject: string;
+  fetchResource: (resource: WordPressResource) => Promise<boolean>;
 }) {
-  const router = useRouter();
   const [assetLoading, setAssetLoading] = useState(false);
 
   return (
-    <div className="group relative flex flex-col gap-4 rounded-xl border border-primary/10 bg-background p-5 shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
-      <div className="flex items-start justify-between">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg ${accent}`}
-        >
-          <Icon size={20} />
-        </div>
-
-        {assetLoading && (
-          <Loader2Icon size={16} className="animate-spin text-primary/40" />
-        )}
-
-        {!assetLoading && count > 0 && (
-          <span
-            className="cursor-pointer text-xs font-semibold text-blue-500 hover:underline"
-            onClick={() =>
-              router.push(
-                `/dashboard/${encodeURIComponent(activeProject)}/export/${
-                  WORDPRESS_RESOURCE_CONFIG[type].type
-                }`,
-              )
-            }
-          >
-            Export
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">{label}</h3>
-        <p className="text-xs leading-relaxed text-primary/50">{description}</p>
-      </div>
-
-      <div className="mt-auto flex items-center justify-between pt-2">
-        <span className="text-xs font-medium text-primary/70">
-          {count} item{count === 1 ? "" : "s"} loaded
-        </span>
-
-        <button
-          type="button"
-          onClick={async () => {
-            setAssetLoading(true);
-            const bool = await fetchResourceTrigger();
-
-            if (!bool) {
-              setAssetLoading(false);
-            }
-          }}
-          disabled={assetLoading}
-          className="inline-flex items-center gap-1 rounded-md border border-primary/10 bg-primary/5 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {assetLoading ? (
-            "Loading..."
-          ) : (
-            <>
-              Fetch
-              <ArrowRightIcon
-                size={12}
-                className="transition-transform group-hover:translate-x-0.5"
-              />
-            </>
-          )}
-        </button>
-      </div>
-    </div>
+    <AssetCard
+      type={type}
+      label={label}
+      description={description}
+      icon={({ className }: { className?: string }) => (
+        <Icon size={20} className={className} />
+      )}
+      accent={accent}
+      count={assetLoading ? null : count}
+      isLoading={assetLoading}
+      onFetch={async () => {
+        setAssetLoading(true);
+        const done = await fetchResource(type);
+        if (done) setAssetLoading(false);
+      }}
+      exportHref={`/dashboard/${encodeURIComponent(activeProject)}/export/${WORDPRESS_RESOURCE_CONFIG[type].type}`}
+    />
   );
 }
 

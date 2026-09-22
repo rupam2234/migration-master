@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "db:migrate": "node --env-file=.env scripts/apply-migration.mjs",
+    "db:smoke": "node --env-file=.env scripts/smoke-snapshots.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
