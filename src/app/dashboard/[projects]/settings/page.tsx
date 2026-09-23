@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  ExternalLink,
   Loader2,
   RefreshCw,
   ShieldCheck,
