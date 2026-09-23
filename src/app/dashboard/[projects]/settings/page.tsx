@@ -12,6 +12,7 @@ import {
   Store,
   Trash2,
   XCircle,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -118,14 +119,19 @@ export default function ProjectSettings() {
   return (
     <div className="max-w-3xl space-y-8">
       {/* Page Header */}
-      <div>
-        <h1 className="text-sm font-semibold tracking-tight text-gray-900">
-          Project Settings
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          View connection status, resync credentials, or manage this store
-          project.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+              Project Settings
+            </h1>
+            <SettingsIcon size={16} className="text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            View connection status, resync credentials, or manage this store
+            project.
+          </p>
+        </div>
       </div>
 
       {/* Shopify Connection Card */}
@@ -262,16 +268,6 @@ export default function ProjectSettings() {
             />
             Refresh Status
           </button>
-
-          <a
-            href={`https://${activeProject}/admin`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 hover:underline"
-          >
-            Open Shopify Admin
-            <ExternalLink className="h-3 w-3" />
-          </a>
         </div>
       </div>
 
@@ -284,7 +280,7 @@ export default function ProjectSettings() {
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-900">
-                Danger Zone: Delete Project
+                Delete Project
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-gray-600">
                 Deleting this project removes the Shopify connection, stored

@@ -71,7 +71,7 @@ export function SelectProject() {
     if (siteToSelect && siteToSelect !== activeProject) {
       setActiveProject(siteToSelect);
     }
-  }, [allProjects, param.projects, activeProject, setActiveProject]);
+  }, [allProjects, param.projects]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -101,7 +101,7 @@ export function SelectProject() {
         title={
           disabled
             ? "Project selection is disabled while exporting."
-            : (selectedItem ?? "Select a project")
+            : (selectedItem ?? "No project selected")
         }
         className={`flex max-w-[260px] items-center gap-1.5 rounded-sm border-2 border-transparent bg-primary/5 px-2 py-1 text-sm font-semibold outline-none transition-colors ${
           disabled
@@ -181,7 +181,7 @@ export function SelectProject() {
 
 function ProjectLabel({ project }: { project?: string }) {
   if (!project) {
-    return <span className="truncate text-primary/50">Select a project</span>;
+    return <span className="truncate text-primary/50">No project selected</span>;
   }
 
   return (

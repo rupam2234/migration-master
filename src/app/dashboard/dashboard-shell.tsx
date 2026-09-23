@@ -29,7 +29,7 @@ export function DashboardShell({
   projects,
 }: DashboardShellProps) {
   const [drawerClosed, setDrawerClosed] = useState<boolean>(true);
-  const { setAllProjects, activeProject } = useProjectContext();
+  const { setAllProjects, activeProject, setActiveProject } = useProjectContext();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -109,6 +109,13 @@ export function DashboardShell({
     if (projects.length === 0) return;
     setAllProjects(projects);
   }, [projects, setAllProjects]);
+
+  useEffect(() => {
+    // Set active project from URL if not already set
+    if (routeProject && routeProject !== activeProject) {
+      setActiveProject(routeProject);
+    }
+  }, [routeProject]);
 
   useEffect(() => {
     const handleClickOutsideProfileMenu = (e: MouseEvent) => {

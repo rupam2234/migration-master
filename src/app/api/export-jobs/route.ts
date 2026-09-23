@@ -194,6 +194,13 @@ export async function POST(req: NextRequest) {
 type CreatePipelineJobCfg = Record<string, unknown> & { siteUrl: string };
 
 
+/**
+ * Lists a shop's export jobs with every field the jobs screen needs in ONE
+ * round trip: job rows + coupon + payment id + exported-item count. Folding
+ * the old per-job detail request into this list keeps the whole page at a
+ * single server request — aggregates are scoped to this shop's job ids so
+ * they stay bounded.
+ */
 export async function GET(req: NextRequest) {
   const shop = req.headers.get("shop");
 
@@ -202,12 +209,41 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await pool.query(
-      `SELECT id, item_count, status, created_at, updated_at FROM export_jobs WHERE shop_domain = $1`,
+    const jobs = await pool.query(
+      `WITH jobs AS (
+         SELECT ej.id, ej.item_count, ej.status, ej.created_at, ej.updated_at,
+                c.code AS coupon_code, c.percent_off AS coupon_percent
+         FROM export_jobs ej
+         LEFT JOIN coupons c ON c.id = ej.coupon_id
+         WHERE ej.shop_domain = $1
+       )
+       SELECT j.id,
+              j.item_count,
+              j.status,
+              j.created_at,
+              j.updated_at,
+              j.coupon_code,
+              j.coupon_percent,
+              COALESCE(ei.exported_count, 0) AS exported_count,
+              p.razorpay_payment_id
+       FROM jobs j
+       LEFT JOIN (
+         SELECT export_job_id, COUNT(*)::int AS exported_count
+         FROM exported_items
+         WHERE export_job_id IN (SELECT id FROM jobs)
+         GROUP BY export_job_id
+       ) ei ON ei.export_job_id = j.id
+       LEFT JOIN (
+         SELECT export_job_id, MAX(razorpay_payment_id) AS razorpay_payment_id
+         FROM payments
+         WHERE export_job_id IN (SELECT id FROM jobs)
+         GROUP BY export_job_id
+       ) p ON p.export_job_id = j.id
+       ORDER BY j.created_at DESC`,
       [shop],
       { fetchOptions: { priority: "high" } }
     );
-    return NextResponse.json(result, { status: 200 });
+    return NextResponse.json(jobs, { status: 200 });
   } catch (error: any) {
     return NextResponse.json(error.message, { status: 500 });
   }

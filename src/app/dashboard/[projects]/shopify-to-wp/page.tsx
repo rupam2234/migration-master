@@ -1,7 +1,7 @@
 "use client";
 
 import { useProjectContext } from "@/context";
-import { TriangleAlert } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { isShopifyProject } from "@/lib/dashboard-routes";
 import {
@@ -14,11 +14,38 @@ import {
 } from "@/lib/sharedResources";
 import { cachedData } from "@/lib/cache";
 import { AssetCard } from "@/components/asset-card";
+import { EstimateStrip } from "@/components/estimate-strip";
+import { GlobalLoader } from "@/components";
+import { useEstimates } from "@/hooks/use-estimates";
+import { isBulkImageResource } from "@/lib/estimate-utils";
 
 export default function ShopifyToWpDashboard() {
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
   const [blogIdInputs, setBlogIdInputs] = useState<Record<string, string>>({});
   const { activeProject, shopifyData, setShopifyData } = useProjectContext();
+  const {
+    estimates,
+    totalCredits,
+    loading: estimatesLoading,
+    refreshing: estimatesRefreshing,
+    partial: estimatesPartial,
+    stale,
+    refresh,
+  } = useEstimates(activeProject);
+
+  // Show loading state if project is still being initialized
+  if (!activeProject) {
+    return <GlobalLoader />;
+  }
+
+  function estimateFor(type: ResourceKey) {
+    const entry = estimates[type];
+    if (!entry) return null;
+    return {
+      ...entry,
+      isFree: isBulkImageResource(type) && entry.credits === 0,
+    };
+  }
 
   const isSuitableProject = isShopifyProject(activeProject);
 
@@ -93,53 +120,42 @@ export default function ShopifyToWpDashboard() {
     }));
   };
 
-  if (!activeProject) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center text-muted-foreground">
-        <TriangleAlert size={48} className="mb-4 text-muted-foreground/40" />
-        <h2 className="mb-2 text-xl font-semibold text-foreground/80">
-          No project selected
-        </h2>
-        <p className="max-w-md text-center text-sm">
-          Pick a project from the sidebar to load the migration dashboard.
-        </p>
-      </div>
-    );
-  }
-
   if (!isSuitableProject) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center text-muted-foreground">
-        <TriangleAlert
-          size={48}
-          className="mb-4 text-amber-500/60"
-        />
-
-        <h2 className="mb-2 text-xl font-semibold text-foreground/80">
-          Wrong project type
-        </h2>
-        <p className="max-w-md text-center text-sm">
-          This dashboard is for Shopify projects. Select a WordPress project for
-          the reverse migration.
-        </p>
-      </div>
-    );
+    return <GlobalLoader />;
   }
 
   return (
     <div className="flex-1 space-y-6">
       <div className="border-b border-border pb-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-base font-semibold tracking-tight text-foreground">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1.5">
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
               Shopify → WordPress
             </h1>
-            <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Choose what to export from your Shopify store.
             </p>
           </div>
+          
+          <button
+            onClick={refresh}
+            disabled={estimatesLoading}
+            className="flex items-center gap-2 rounded-md bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ArrowRight size={14} />
+            {estimatesLoading ? "Estimating..." : "Re-estimate"}
+          </button>
         </div>
       </div>
+
+      <EstimateStrip
+        totalCredits={totalCredits}
+        loading={estimatesLoading}
+        refreshing={estimatesRefreshing}
+        partial={estimatesPartial}
+        stale={stale}
+        onRefresh={refresh}
+      />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {RESOURCE_KEYS.map((type) => {
@@ -163,6 +179,8 @@ export default function ShopifyToWpDashboard() {
               blogIdValue={blogIdValue}
               onBlogIdChange={(value) => handleBlogIdChange(type, value)}
               exportHref={`/dashboard/${encodeURIComponent(activeProject)}/export/${ResourceTypes[type]}`}
+              estimate={estimateFor(type)}
+              estimateLoading={estimatesLoading}
             />
           );
         })}

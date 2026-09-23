@@ -17,12 +17,21 @@ import {
   ShoppingCartIcon,
   TagsIcon,
   Ticket,
-  TriangleAlert,
   UsersIcon,
 } from "lucide-react";
-import { ElementType, ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  ElementType,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { cachedData, cleanExpiredCache } from "@/lib/cache";
 import { AssetCard } from "@/components/asset-card";
+import { EstimateStrip } from "@/components/estimate-strip";
+import { GlobalLoader } from "@/components";
+import { useEstimates } from "@/hooks/use-estimates";
+import { isBulkImageResource, type ResourceEstimate } from "@/lib/estimate-utils";
 
 const WORDPRESS_RESOURCE_CONFIG: Record<WordPressResource, WordPressService> = {
   posts: {
@@ -103,6 +112,12 @@ const CONNECTION_STATUS_STYLES: Record<ConnectionStatusTag, string> = {
   "Not Connected": "text-red-400",
 };
 
+// Connection probes are cached briefly so revisiting the page or switching
+// services doesn't re-hit the status APIs on every mount; a forced check
+// (refresh button / window focus) bypasses the cache.
+const WP_STATUS_TTL = 30 * 1000;
+const SHOPIFY_CONNECTION_TTL = 30 * 1000;
+
 interface ShopifyImportConnection {
   id: string | null;
   projectName: string | null;
@@ -118,6 +133,21 @@ export default function WpToShopifyDashboard() {
   const { activeProject, wordPressData, setWordPressData } =
     useProjectContext();
   const isSuitableProject = !isShopifyProject(activeProject);
+  const {
+    estimates,
+    totalCredits,
+    loading: estimatesLoading,
+    refreshing: estimatesRefreshing,
+    partial: estimatesPartial,
+    stale,
+    refresh,
+  } = useEstimates(activeProject);
+
+  // Every hook in this component must be declared *before* the early returns
+  // further down: `activeProject` is null on the first render (it is hydrated
+  // from the route param), so bailing out early would render fewer hooks than
+  // the follow-up render and React would throw "Rendered more hooks than
+  // during the previous render".
   const [wpStatus, setWpStatus] = useState<ConnectionStatusTag>("Checking...");
   const [wpChecking, setWpChecking] = useState<boolean>(true);
   const [shopifyStatus, setShopifyStatus] =
@@ -130,100 +160,108 @@ export default function WpToShopifyDashboard() {
     cleanExpiredCache({ prefix: "wp-cache:", session_Storage: true });
   }, []);
 
-  const WP_STATUS_TTL = 30 * 1000;
-  const SHOPIFY_CONNECTION_TTL = 30 * 1000;
+  const checkWordPressConnection = useCallback(
+    async (force = false) => {
+      if (!activeProject || !isSuitableProject) return;
 
-  const checkWordPressConnection = useCallback(async (force = false) => {
-    if (!activeProject || !isSuitableProject) return;
+      setWpChecking(true);
 
-    setWpChecking(true);
+      try {
+        // Short-lived cache so toggling between services / revisiting the page
+        // doesn't re-hit the status API on every mount. `force` bypasses it.
+        const { response: data } = await cachedData<
+          { source_status?: boolean },
+          [string]
+        >({
+          key: `wp-cache:conn-wp-status:${activeProject}`,
+          fn: async () => {
+            const res = await fetch(
+              "/api/wordpress/wordpress-connector/status",
+              {
+                headers: {
+                  "x-site": activeProject,
+                  "Content-Type": "Application/json",
+                },
+              },
+            );
 
-    try {
-      // Short-lived cache so toggling between services / revisiting the page
-      // doesn't re-hit the status API on every mount. `force` bypasses it.
-      const { response: data } = await cachedData<
-        { source_status?: boolean },
-        [string]
-      >({
-        key: `wp-cache:conn-wp-status:${activeProject}`,
-        fn: async () => {
-          const res = await fetch("/api/wordpress/wordpress-connector/status", {
-            headers: {
-              "x-site": activeProject,
-              "Content-Type": "Application/json",
-            },
-          });
+            if (!res.ok) {
+              throw new Error("Failed to verify WordPress connection");
+            }
 
-          if (!res.ok) {
-            throw new Error("Failed to verify WordPress connection");
-          }
+            return res.json() as Promise<{ source_status?: boolean }>;
+          },
+          args: [activeProject],
+          session_Storage: true,
+          ttl: WP_STATUS_TTL,
+          useCache: !force,
+        });
 
-          return res.json() as Promise<{ source_status?: boolean }>;
-        },
-        args: [activeProject],
-        session_Storage: true,
-        ttl: WP_STATUS_TTL,
-        useCache: !force,
-      });
-
-      setWpStatus(data.source_status === true ? "Connected" : "Not Connected");
-    } catch (error) {
-      console.error("WordPress connection check failed:", error);
-      setWpStatus("Not Connected");
-    } finally {
-      setWpChecking(false);
-    }
-  }, [activeProject, isSuitableProject]);
-
-  const checkShopifyConnection = useCallback(async (force = false) => {
-    if (!activeProject || !isSuitableProject) return;
-
-    setShopifyChecking(true);
-
-    try {
-      const { response: data } = await cachedData<
-        ShopifyImportConnection,
-        [string]
-      >({
-        key: `wp-cache:conn-shopify:${activeProject}`,
-        fn: async () => {
-          const res = await fetch(
-            `/api/shopify/import-connection?project=${encodeURIComponent(
-              activeProject,
-            )}`,
-          );
-
-          if (!res.ok) {
-            throw new Error("Failed to load the Shopify destination");
-          }
-
-          return res.json() as Promise<ShopifyImportConnection>;
-        },
-        args: [activeProject],
-        session_Storage: true,
-        ttl: SHOPIFY_CONNECTION_TTL,
-        useCache: !force,
-      });
-
-      setShopifyConnection(data);
-
-      let nextStatus: ConnectionStatusTag = "Not Connected";
-
-      if (data.connected) {
-        nextStatus = "Connected";
-      } else if (data.status === "PENDING") {
-        nextStatus = "Pending";
+        setWpStatus(
+          data.source_status === true ? "Connected" : "Not Connected",
+        );
+      } catch (error) {
+        console.error("WordPress connection check failed:", error);
+        setWpStatus("Not Connected");
+      } finally {
+        setWpChecking(false);
       }
+    },
+    [activeProject, isSuitableProject],
+  );
 
-      setShopifyStatus(nextStatus);
-    } catch (error) {
-      console.error("Shopify connection check failed:", error);
-      setShopifyConnection(null);
-      setShopifyStatus("Not Connected");
-    } finally {
-      setShopifyChecking(false);
-    }
-  }, [activeProject, isSuitableProject]);
+  const checkShopifyConnection = useCallback(
+    async (force = false) => {
+      if (!activeProject || !isSuitableProject) return;
+
+      setShopifyChecking(true);
+
+      try {
+        const { response: data } = await cachedData<
+          ShopifyImportConnection,
+          [string]
+        >({
+          key: `wp-cache:conn-shopify:${activeProject}`,
+          fn: async () => {
+            const res = await fetch(
+              `/api/shopify/import-connection?project=${encodeURIComponent(
+                activeProject,
+              )}`,
+            );
+
+            if (!res.ok) {
+              throw new Error("Failed to load the Shopify destination");
+            }
+
+            return res.json() as Promise<ShopifyImportConnection>;
+          },
+          args: [activeProject],
+          session_Storage: true,
+          ttl: SHOPIFY_CONNECTION_TTL,
+          useCache: !force,
+        });
+
+        setShopifyConnection(data);
+
+        let nextStatus: ConnectionStatusTag = "Not Connected";
+
+        if (data.connected) {
+          nextStatus = "Connected";
+        } else if (data.status === "PENDING") {
+          nextStatus = "Pending";
+        }
+
+        setShopifyStatus(nextStatus);
+      } catch (error) {
+        console.error("Shopify connection check failed:", error);
+        setShopifyConnection(null);
+        setShopifyStatus("Not Connected");
+      } finally {
+        setShopifyChecking(false);
+      }
+    },
+    [activeProject, isSuitableProject],
+  );
 
   useEffect(() => {
     checkWordPressConnection();
@@ -236,11 +274,7 @@ export default function WpToShopifyDashboard() {
   // fresh (cache-bypassing) check on window focus instead of requiring a
   // manual reload.
   useEffect(() => {
-    if (
-      !activeProject ||
-      !isSuitableProject ||
-      shopifyStatus === "Connected"
-    ) {
+    if (!activeProject || !isSuitableProject || shopifyStatus === "Connected") {
       return;
     }
 
@@ -274,40 +308,20 @@ export default function WpToShopifyDashboard() {
       window.removeEventListener("focus", pollFresh);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [
-    activeProject,
-    isSuitableProject,
-    shopifyStatus,
-    checkShopifyConnection,
-  ]);
+  }, [activeProject, isSuitableProject, shopifyStatus, checkShopifyConnection]);
 
+  // ---------------------------------------------------------------------------
+  // Guards — these must stay *after* every hook above (see the note at the top
+  // of the component) so the hook order never changes between renders.
+  // ---------------------------------------------------------------------------
+
+  // Show loading state if project is still being initialized
   if (!activeProject) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center text-primary/60">
-        <TriangleAlert size={48} className="mb-4 text-primary/40" />
-        <h2 className="mb-2 text-xl font-semibold text-primary/80">
-          No project selected
-        </h2>
-        <p className="max-w-md text-center text-sm">
-          Pick a project from the sidebar to load the migration dashboard.
-        </p>
-      </div>
-    );
+    return <GlobalLoader />;
   }
 
   if (!isSuitableProject) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center text-primary/60">
-        <TriangleAlert size={48} className="mb-4 text-amber-500/60" />
-        <h2 className="mb-2 text-xl font-semibold text-primary/80">
-          Migration path is not suitable for this project
-        </h2>
-        <p className="max-w-md text-center text-sm">
-          WordPress to Shopify exports are only available for connected
-          WordPress sites.
-        </p>
-      </div>
-    );
+    return <GlobalLoader />;
   }
 
   const shopifyConnectUrl = shopifyConnection?.connectUrl ?? null;
@@ -356,17 +370,32 @@ export default function WpToShopifyDashboard() {
     }
   }
 
+  function estimateFor(type: WordPressResource) {
+    // Estimate keys are normalised to upper case by the estimator, while
+    // WordPress resource slugs are lower case — match on the normalised key.
+    const key = type.toUpperCase();
+    const entry = estimates[key];
+    if (!entry) return null;
+    return {
+      ...entry,
+      isFree: isBulkImageResource(key) && entry.credits === 0,
+    };
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-base font-semibold tracking-tight text-foreground">
-            WordPress → Shopify
-          </h1>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1.5">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+              WordPress → Shopify
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
             Choose what to export from your WordPress site.
           </p>
         </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <ConnectionChip
             label="WordPress Source"
@@ -439,11 +468,21 @@ export default function WpToShopifyDashboard() {
         </p>
       )}
 
+      <EstimateStrip
+        totalCredits={totalCredits}
+        loading={estimatesLoading}
+        refreshing={estimatesRefreshing}
+        partial={estimatesPartial}
+        stale={stale}
+        onRefresh={refresh}
+      />
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {[...MMC_RESOURCES, ...WOO_RESOURCES].map((assetType) => {
           const type = assetType.toLocaleLowerCase() as WordPressResource;
           const config = WORDPRESS_RESOURCE_CONFIG[type];
           const count = (wordPressData[assetType] as any[]).length;
+          const entry = estimateFor(assetType);
 
           return (
             <WpAssetCard
@@ -456,6 +495,8 @@ export default function WpToShopifyDashboard() {
               count={count}
               activeProject={activeProject}
               fetchResource={fetchResource}
+              estimate={entry}
+              estimateLoading={estimatesLoading}
             />
           );
         })}
@@ -473,6 +514,8 @@ function WpAssetCard({
   count,
   activeProject,
   fetchResource,
+  estimate,
+  estimateLoading,
 }: {
   type: WordPressResource;
   label: string;
@@ -482,6 +525,8 @@ function WpAssetCard({
   count: number;
   activeProject: string;
   fetchResource: (resource: WordPressResource) => Promise<boolean>;
+  estimate: (ResourceEstimate & { isFree: boolean }) | null;
+  estimateLoading: boolean;
 }) {
   const [assetLoading, setAssetLoading] = useState(false);
 
@@ -502,6 +547,8 @@ function WpAssetCard({
         if (done) setAssetLoading(false);
       }}
       exportHref={`/dashboard/${encodeURIComponent(activeProject)}/export/${WORDPRESS_RESOURCE_CONFIG[type].type}`}
+      estimate={estimate}
+      estimateLoading={estimateLoading}
     />
   );
 }
