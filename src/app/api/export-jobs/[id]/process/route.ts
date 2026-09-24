@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/api";
 import {
+  activateExportJob,
   claimNextBatch,
   failPipelineJob,
   finalizeIfComplete,
@@ -29,31 +30,30 @@ export async function POST(
     const job = await getPipelineJob(params.id, user.id);
 
     if (!job) {
-      return NextResponse.json({ message: "Job not found" }, { status: 404 });
-    }
-
-    if (job.status === "READY") {
-      return NextResponse.json({
-        done: true,
-        status: job.status,
-        processed: job.processed_batches,
-        total: job.total_batches,
-        partCount: job.part_count,
-      });
-    }
-
-    if (job.status === "FAILED") {
       return NextResponse.json(
-        { message: job.error ?? "Job previously failed" },
+        { message: "We couldn’t find that export." },
+        { status: 404 },
+      );
+    }
+
+    if (job.status !== "QUEUED" && job.status !== "PAID" && job.status !== "PROCESSING") {
+      return NextResponse.json(
+        { message: "This export is no longer active." },
         { status: 409 },
       );
     }
 
-    if (job.status === "AWAITING_DATA") {
-      return NextResponse.json(
-        { message: "Batch upload is not complete for this job" },
-        { status: 409 },
-      );
+    if (job.status === "QUEUED" || job.status === "PAID") {
+      const activated = await activateExportJob(job.id);
+      if (!activated) {
+        return NextResponse.json({
+          done: false,
+          queued: true,
+          status: "QUEUED",
+          message: "Your export is safely queued and will begin as soon as capacity is available.",
+        }, { status: 202 });
+      }
+      job.status = "PROCESSING";
     }
 
     const batch = await claimNextBatch(job.id);
@@ -90,7 +90,7 @@ export async function POST(
   } catch (err: any) {
     console.error("Failed to process batch:", err);
     return NextResponse.json(
-      { message: err?.message ?? "Failed to process batch" },
+      { message: "We couldn’t complete your export. Your progress is saved; please try again shortly." },
       { status: 500 },
     );
   }

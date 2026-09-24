@@ -65,6 +65,11 @@ export default function RootLayout({
       >
         <head>
           <Script
+            id="razorpay-checkout"
+            src="https://checkout.razorpay.com/v1/checkout.js"
+            strategy="afterInteractive"
+          />
+          <Script
             id="crisp-chat"
             strategy="afterInteractive"
             dangerouslySetInnerHTML={{

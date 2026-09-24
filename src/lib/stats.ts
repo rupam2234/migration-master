@@ -16,13 +16,13 @@ export const getSiteStats = unstable_cache(
     try {
       // Total number of migration projects (export jobs)
       const projectsResult = await pool.query(
-        `SELECT COUNT(*) AS projects FROM export_jobs`,
+        `SELECT COUNT(*) AS projects FROM export_pipeline_jobs`,
       );
       const { projects } = projectsResult[0] || { projects: 0 };
 
-      // Total number of transferred items (exported items)
+      // Total number of transferred items across credit-based exports.
       const transfersResult = await pool.query(
-        `SELECT COUNT(*) AS transfers FROM exported_items`,
+        `SELECT COALESCE(SUM(total_items), 0) AS transfers FROM export_pipeline_jobs`,
       );
       const { transfers } = transfersResult[0] || { transfers: 0 };
 

@@ -99,6 +99,10 @@ export async function getSnapshot(
   snapshotId: string,
   userId: string,
 ): Promise<SnapshotRow | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(snapshotId)) {
+    return null;
+  }
+
   const rows = await pool.query(
     `SELECT * FROM source_snapshots WHERE id = $1 AND user_id = $2`,
     [snapshotId, userId],

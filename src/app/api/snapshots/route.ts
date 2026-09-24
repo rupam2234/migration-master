@@ -8,7 +8,6 @@ import { acquireRedisLock, releaseRedisLock } from "@/lib/redis";
 import { requiresScope } from "@/lib/sharedResources";
 import {
   SNAPSHOT_PAGE_SIZE,
-  deleteExpiredSnapshots,
   findLiveSnapshot,
   normalizeItems,
   readSnapshotPage,
@@ -162,10 +161,6 @@ export async function POST(req: NextRequest) {
         items,
         sourceHost: project,
       });
-
-      // Opportunistic housekeeping — expired snapshots are cheapest to drop
-      // here rather than from a scheduled job.
-      await deleteExpiredSnapshots().catch(() => undefined);
 
       return NextResponse.json(
         await snapshotResponse(snapshot, {

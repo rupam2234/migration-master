@@ -9,12 +9,14 @@ export function ExportHeader({
   direction,
   total,
   selectedCount,
+  requiredCredits,
 }: {
   icon?: React.ComponentType<{ size?: number; className?: string }>;
   resourceLabel: string;
   direction: ExportDirection;
   total: number;
   selectedCount: number;
+  requiredCredits: number;
 }) {
   return (
     <header className="flex items-start justify-between gap-4">
@@ -40,6 +42,12 @@ export function ExportHeader({
                     never charged again, even if your current selection also
                     includes new items.
                   </p>
+                  {requiredCredits > 0 && (
+                    <p className="pt-2">
+                      Credit-based export requires {requiredCredits} credits.
+                      Purchase credits from the credits page.
+                    </p>
+                  )}
                 </div>
               }
               trigger={
@@ -67,6 +75,12 @@ export function ExportHeader({
             {selectedCount > 0 && (
               <span className="font-medium text-blue-600">
                 · {selectedCount.toLocaleString()} selected
+              </span>
+            )}
+
+            {requiredCredits > 0 && (
+              <span className="font-medium text-green-600">
+                · {requiredCredits} credits required
               </span>
             )}
           </div>

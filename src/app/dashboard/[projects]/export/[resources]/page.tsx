@@ -5,7 +5,7 @@ import { FolderOpen, PackageOpen } from "lucide-react";
 import { useProjectContext } from "@/context";
 import { useParams } from "next/navigation";
 import { GlobalLoader } from "@/components";
-import { PaymentModal } from "@/components/theme/paymentModal";
+import { CreditPurchaseModal } from "./credit-purchase-modal";
 import { RESOURCE_CONFIG, ResourceKey } from "@/lib/sharedResources";
 import { EmptyState } from "./empty-state";
 import { ExportHeader } from "./export-header";
@@ -14,7 +14,7 @@ import { RecordsPanel } from "./records-panel";
 import { EXPORT_PAGE_SIZE, formatCell, truncateCell } from "./export-config";
 import { useExportRecords } from "./use-export-records";
 import { useExportPipeline } from "./use-export-pipeline";
-import { useExportCheckout } from "./use-export-checkout";
+import { useCreditExport } from "./use-credit-export";
 
 export default function ExportResources() {
   const params = useParams();
@@ -40,11 +40,19 @@ export default function ExportResources() {
     search: records.search,
   });
 
-  const checkout = useExportCheckout({
+  // Credit-based export pipeline
+  const creditExport = useCreditExport({
     activeProject,
-    billingResource: resourceKey === "IMAGES" ? "MEDIA_LIBRARY" : resourceKey,
-    selectedIds: pipeline.selectedIds,
-    runPipeline: pipeline.run,
+    resourceKey,
+    resourceParam,
+    direction: records.exportDirection,
+    snapshot: records.snapshot,
+    records: records.records,
+    selected: records.selected,
+    includeAll: records.includeAll,
+    allRecordIds: records.allRecordIds,
+    search: records.search,
+    requiredCredits: records.ownership.newCount,
   });
 
   const ResourceIcon = RESOURCE_CONFIG[resourceKey]?.icon;
@@ -55,6 +63,8 @@ export default function ExportResources() {
     setPreviewIndex(0);
   }, [records.records]);
 
+  // Required credits are calculated from records that have not already been
+  // exported for this project and resource.
   // ---------------- row selection helpers ----------------
 
   const totalPages = Math.max(1, Math.ceil(records.filtered.length / EXPORT_PAGE_SIZE));
@@ -134,8 +144,15 @@ export default function ExportResources() {
     : null;
 
   const pipelineBusy = pipeline.busy || pipeline.running;
+  const creditExportBusy = creditExport.busy || creditExport.running;
+  const snapshotReady = records.snapshotReady;
   const ctaDisabled =
-    pipelineBusy || records.idsLoading || records.selectedCount === 0;
+    pipelineBusy ||
+    creditExportBusy ||
+    records.idsLoading ||
+    records.ownershipLoading ||
+    !snapshotReady ||
+    records.selectedCount === 0;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -145,6 +162,7 @@ export default function ExportResources() {
         direction={records.exportDirection}
         total={records.snapshot?.total ?? records.records.length}
         selectedCount={records.selectedCount}
+        requiredCredits={records.ownership.newCount}
       />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
@@ -173,38 +191,50 @@ export default function ExportResources() {
           idsLoading={records.idsLoading}
           onToggleIncludeAll={() => records.setIncludeAll(!records.includeAll)}
           refreshing={records.refreshing}
-          busy={pipelineBusy}
+          busy={pipelineBusy || creditExportBusy}
           onRefresh={records.refreshSnapshot}
           formatCell={formatCell}
           truncate={truncateCell}
         />
 
         <ExportSummary
-          direction={records.exportDirection}
           pipeline={pipeline.pipeline}
-          checkingEligibility={checkout.checking}
+          creditExport={creditExport.pipeline}
           ctaDisabled={ctaDisabled}
-          onStart={checkout.startExport}
+          onCreditExport={async () => {
+            if (!snapshotReady) return;
+
+            try {
+              await creditExport.run();
+            } catch (error: any) {
+              // The hook now handles insufficient credits by showing the modal
+              // No need to handle it here
+              console.error("Export failed:", error);
+            }
+          }}
           selectedCount={records.selectedCount}
           snapshotError={records.snapshotError}
           previewItem={previewItem}
           previewRowNumber={previewRowNumber}
           resourceKey={resourceKey}
+          requiredCredits={records.ownership.newCount}
+          ownedCount={records.ownership.ownedCount}
+          ownershipLoading={records.ownershipLoading}
         />
       </div>
 
-      <PaymentModal
-        open={checkout.showPaymentModal}
-        itemIds={checkout.newItemIds}
-        shopDomain={activeProject}
-        resource={resourceKey === "IMAGES" ? "MEDIA_LIBRARY" : resourceKey}
-        initialCurrency={checkout.checkoutMeta?.currency}
-        initialExchangeRate={checkout.checkoutMeta?.exchangeRate}
-        freeDownloadsUsed={checkout.checkoutMeta?.freeDownloadsUsed}
-        freeDownloadsLimit={checkout.checkoutMeta?.freeDownloadsLimit}
-        eligibleForFree={checkout.checkoutMeta?.eligibleForFree}
-        onSuccess={checkout.handlePaymentSuccess}
-        onClose={checkout.closePaymentModal}
+      <CreditPurchaseModal
+        open={creditExport.showPurchaseModal}
+        onOpenChange={(open) => {
+          creditExport.setShowPurchaseModal(open);
+          if (!open && !creditExport.busy) creditExport.cancel();
+        }}
+        requiredCredits={records.ownership.newCount}
+        onPaymentCancelled={creditExport.cancel}
+        onPaymentSuccess={async (transactionId) => {
+          creditExport.setShowPurchaseModal(false);
+          await creditExport.run(transactionId);
+        }}
       />
     </div>
   );

@@ -101,7 +101,9 @@ export function useExportPipeline({
 
       if (!createRes.ok) {
         const err = await createRes.json().catch(() => null);
-        throw new Error(err?.message ?? "Failed to create export job");
+        throw new Error(
+          err?.message ?? "We couldn’t start your export. Please try again in a moment.",
+        );
       }
 
       const created = await createRes.json();

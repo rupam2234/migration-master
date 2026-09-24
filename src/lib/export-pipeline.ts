@@ -19,6 +19,7 @@ import { getSnapshot, itemId, readSnapshotPage } from "./snapshots";
 import { generateWXR, type WXRConfig } from "./wxr_generator";
 import { generateShopifyCsv } from "./shopify-csv";
 import type { ShopifyResources, WordPressResource } from "./sharedResources";
+import { hasSufficientCredits, deductCreditsForExport } from "./payment-utils";
 
 /** Single batch size for uploads + transforms. One job process call = one batch. */
 export const PIPELINE_BATCH_SIZE = 150;
@@ -26,10 +27,11 @@ export const PIPELINE_BATCH_SIZE = 150;
 export type ExportDirection = "shopify_to_wp" | "wp_to_shopify";
 
 export type PipelineStatus =
-  | "AWAITING_DATA"
   | "PROCESSING"
+  | "QUEUED"
   | "READY"
-  | "FAILED";
+  | "FAILED"
+  | "PAID";
 
 /** One export job. Persisted in Neon. */
 export interface PipelineJobRow {
@@ -62,6 +64,8 @@ export interface CreatePipelineJobInput {
   totalItems: number;
   totalBatches: number;
   cfg?: WXRConfig | null;
+  snapshotId?: string | null;
+  initialStatus?: "PROCESSING" | "QUEUED";
 }
 
 /** What to seed from a snapshot: every record, or an explicit id list. */
@@ -87,15 +91,48 @@ export function decompressArtifact(content: string): string {
 
 /* ============================ job creation ============================ */
 
+export async function getActiveExportJob(input: {
+  userId: string;
+  project: string;
+  direction: ExportDirection;
+  resource: string;
+}): Promise<PipelineJobRow | null> {
+  const rows = await pool.query(
+    `SELECT * FROM export_pipeline_jobs
+     WHERE user_id = $1 AND project = $2 AND direction = $3 AND resource = $4
+       AND status IN ('QUEUED', 'PAID', 'PROCESSING')
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [input.userId, input.project, input.direction, input.resource],
+  );
+  return (rows[0] as PipelineJobRow) ?? null;
+}
+
+export async function activateExportJob(
+  jobId: string,
+  maxActiveJobs = 3,
+): Promise<boolean> {
+  const rows = await pool.query(
+    `UPDATE export_pipeline_jobs
+     SET status = 'PROCESSING', updated_at = NOW()
+     WHERE id = $1
+       AND status IN ('QUEUED', 'PAID')
+       AND (SELECT COUNT(*) FROM export_pipeline_jobs WHERE status = 'PROCESSING') < $2
+     RETURNING id`,
+    [jobId, maxActiveJobs],
+  );
+  return rows.length > 0;
+}
+
 export async function createPipelineJob(
   input: CreatePipelineJobInput,
 ): Promise<PipelineJobRow> {
   const rows = await pool.query(
     `INSERT INTO export_pipeline_jobs
        (user_id, project, direction, resource, resource_label, status,
-        total_items, total_batches, current_batch_seq, cfg)
-     VALUES ($1, $2, $3, $4, $5, 'AWAITING_DATA', $6, $7, NULL,
-             $8::jsonb)
+        total_items, total_batches, current_batch_seq, cfg, snapshot_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL,
+             $9::jsonb, $10)
      RETURNING *`,
     [
       input.userId,
@@ -103,9 +140,11 @@ export async function createPipelineJob(
       input.direction,
       input.resource,
       input.resource_label,
-      input.totalItems,
+      input.initialStatus ?? "PROCESSING",
+       input.totalItems,
       input.totalBatches,
       input.cfg ? JSON.stringify(input.cfg) : null,
+      input.snapshotId ?? null,
     ],
   );
 
@@ -227,7 +266,27 @@ function transformBatch(
   return generateShopifyCSV(resource as WordPressResource, items);
 }
 
-/** Transform a claimed batch and persist its artifact part. */
+/** Record ownership for one bounded export batch. Retries are idempotent. */
+async function claimBatchOwnership(
+  job: PipelineJobRow,
+  records: any[],
+): Promise<void> {
+  const itemIds = Array.from(
+    new Set(records.map((record) => itemId(record).trim()).filter(Boolean)),
+  );
+  if (itemIds.length === 0) return;
+
+  await pool.query(
+    `INSERT INTO exported_item_ownership
+      (user_id, project, direction, resource, item_id, first_job_id)
+     SELECT $1, $2, $3, $4, item_id, $5
+     FROM UNNEST($6::text[]) AS item_id
+     ON CONFLICT (user_id, project, direction, resource, item_id) DO NOTHING`,
+    [job.user_id, job.project, job.direction, job.resource, job.id, itemIds],
+  );
+}
+
+/** Transform a claimed batch and persist its artifact and ownership. */
 export async function processBatch(
   job: PipelineJobRow,
   batch: { seq: number; records: any[] },
@@ -253,12 +312,14 @@ export async function processBatch(
     ],
   );
 
+  await claimBatchOwnership(job, batch.records);
+
   await pool.query(
     `UPDATE export_pipeline_jobs
      SET processed_batches = processed_batches + 1,
           part_count = part_count + 1,
          current_batch_seq = $2,
-         status = CASE WHEN processed_batches + 1 >= total_batches THEN 'READY' ELSE status END,
+         status = CASE WHEN processed_batches + 1 >= total_batches THEN status ELSE 'PROCESSING' END,
          updated_at = NOW()
      WHERE id = $1`,
     [job.id, batch.seq],
@@ -266,23 +327,53 @@ export async function processBatch(
 }
 
 
+export async function getOwnedItemIds(input: {
+  userId: string;
+  project: string;
+  direction: ExportDirection;
+  resource: string;
+  itemIds: string[];
+}): Promise<Set<string>> {
+  if (input.itemIds.length === 0) return new Set();
+
+  const owned = new Set<string>();
+  const chunkSize = 1_000;
+  for (let start = 0; start < input.itemIds.length; start += chunkSize) {
+    const chunk = input.itemIds.slice(start, start + chunkSize);
+    const rows = await pool.query(
+      `SELECT item_id FROM exported_item_ownership
+       WHERE user_id = $1 AND project = $2 AND direction = $3 AND resource = $4
+         AND item_id = ANY($5::text[])`,
+      [input.userId, input.project, input.direction, input.resource, chunk],
+    );
+    for (const row of rows) owned.add(String(row.item_id));
+  }
+  return owned;
+}
+
 /** Mark the job READY when all parts arrived, so the client can download. */
 export async function finalizeIfComplete(
   jobId: string,
 ): Promise<PipelineJobRow | null> {
-  await pool.query(
-    `UPDATE export_pipeline_jobs
-      SET status = CASE WHEN processed_batches >= total_batches AND total_batches > 0 THEN 'READY' ELSE status END,
-          updated_at = NOW()
-      WHERE id = $1`,
-    [jobId],
-  );
+  const current = await getPipelineJobById(jobId);
+  if (!current) return null;
+  if (current.status !== "READY" && current.processed_batches >= current.total_batches && current.total_batches > 0) {
+    await pool.query(
+      `UPDATE export_pipeline_jobs
+        SET status = 'READY', updated_at = NOW()
+        WHERE id = $1 AND status <> 'READY'`,
+      [jobId],
+    );
+  }
 
+  return getPipelineJobById(jobId);
+}
+
+async function getPipelineJobById(jobId: string): Promise<PipelineJobRow | null> {
   const rows = await pool.query(
     `SELECT * FROM export_pipeline_jobs WHERE id = $1`,
     [jobId],
   );
-
   return (rows[0] as PipelineJobRow) ?? null;
 }
 
@@ -441,7 +532,11 @@ export async function seedJobBatchesFromSnapshot(
      SET total_items = $2,
          total_batches = $3,
          uploaded_batches = $3,
-         status = CASE WHEN $3 > 0 THEN 'PROCESSING' ELSE 'FAILED' END,
+         status = CASE
+           WHEN status IN ('QUEUED', 'PAID') THEN status
+           WHEN $3 > 0 THEN 'PROCESSING'
+           ELSE 'FAILED'
+         END,
          error = CASE WHEN $3 > 0 THEN NULL
                       ELSE 'No records matched the selection' END,
          updated_at = NOW()
@@ -479,6 +574,7 @@ export async function CreateSnapshotAndJob(input: {
     totalItems: 0,
     totalBatches: 0,
     cfg: null,
+    snapshotId: input.snapshotId,
   });
 
   const { totalItems, totalBatches } = await seedJobBatchesFromSnapshot({
@@ -494,6 +590,123 @@ export async function CreateSnapshotAndJob(input: {
   if (totalBatches === 0) {
     return { jobId: job.id, totalItems: 0, totalBatches: 0 };
   }
+
+  return { jobId: job.id, totalItems, totalBatches };
+}
+
+/* ============================ credit-based export ============================ */
+
+export async function createPaidExportJob(input: {
+  userId: string;
+  project: string;
+  direction: ExportDirection;
+  resource: string;
+  resourceLabel: string | null;
+  snapshotId: string;
+  selection: SnapshotSelection;
+  requiredCredits: number;
+  paymentTransactionId?: string;
+}): Promise<{ jobId: string; totalItems: number; totalBatches: number }> {
+  const { userId, project, direction, resource, snapshotId, selection, paymentTransactionId } = input;
+  const snapshot = await getSnapshot(snapshotId, userId);
+  if (!snapshot || snapshot.status !== "READY") {
+    throw new Error("A ready snapshot is required to calculate export credits");
+  }
+
+  const selectedIds: string[] = [];
+  if (selection === "all") {
+    for (let pageNo = 1; pageNo <= snapshot.total_pages; pageNo++) {
+      const records = await readSnapshotPage(snapshot.id, pageNo);
+      for (const record of records) {
+        const id = itemId(record).trim();
+        if (id) selectedIds.push(id);
+      }
+    }
+  } else {
+    for (const id of selection.ids) {
+      const normalized = id.trim();
+      if (normalized) selectedIds.push(normalized);
+    }
+  }
+
+  const ownedIds = await getOwnedItemIds({
+    userId,
+    project,
+    direction,
+    resource,
+    itemIds: selectedIds,
+  });
+  const billableCredits = selectedIds.filter((id) => !ownedIds.has(id)).length;
+
+  if (billableCredits > 0) {
+    const creditCheck = await hasSufficientCredits(userId, billableCredits);
+    if (!creditCheck.hasEnough) {
+      throw new Error(`Insufficient credits. Required: ${billableCredits}, Available: ${creditCheck.currentBalance}`);
+    }
+  }
+
+  const job = await createPipelineJob({
+    userId: input.userId,
+    project: input.project,
+    direction: input.direction,
+    resource: input.resource,
+    resource_label: input.resourceLabel,
+    totalItems: 0,
+    totalBatches: 0,
+    cfg: null,
+    snapshotId: input.snapshotId,
+    initialStatus: "QUEUED",
+  });
+
+  // Seed the job from snapshot
+  const { totalItems, totalBatches } = await seedJobBatchesFromSnapshot({
+    jobId: job.id,
+    userId: input.userId,
+    snapshotId: input.snapshotId,
+    selection: input.selection,
+  });
+
+  if (totalBatches === 0) {
+    throw new Error('No records matched the selection');
+  }
+
+  if (billableCredits > 0) {
+    const { success } = await deductCreditsForExport(
+      userId,
+      job.id,
+      billableCredits
+    );
+
+    if (!success) {
+      throw new Error('Failed to deduct credits');
+    }
+  }
+
+  // Attach the verified payment transaction and its coupon metadata. Only a
+  // completed transaction owned by this user may be attached.
+  if (paymentTransactionId) {
+    await pool.query(
+      `UPDATE export_pipeline_jobs j
+       SET payment_transaction_id = pt.id,
+           coupon_code = pt.coupon_code,
+           coupon_percent = c.discount_percent
+       FROM payment_transactions pt
+       LEFT JOIN credit_coupons c ON c.id = pt.coupon_id
+       WHERE j.id = $1
+         AND pt.id = $2
+         AND pt.user_id = $3
+         AND pt.status = 'COMPLETED'`,
+      [job.id, paymentTransactionId, userId],
+    );
+  }
+
+  // Update job status to QUEUED
+  await pool.query(
+    `UPDATE export_pipeline_jobs
+     SET status = 'QUEUED', updated_at = NOW()
+     WHERE id = $1`,
+    [job.id]
+  );
 
   return { jobId: job.id, totalItems, totalBatches };
 }

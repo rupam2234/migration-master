@@ -10,11 +10,14 @@ import {
   SelectProject,
 } from "@/components";
 import { useProjectContext } from "@/context";
+import { CreditWallet } from "@/components/credits/credit-wallet";
+import { CreditPurchaseModal } from "@/app/dashboard/[projects]/export/[resources]/credit-purchase-modal";
 import {
   getDashboardProjectPath,
   SHOPIFY_TO_WP_PATH,
 } from "@/lib/dashboard-routes";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Coins, Plus } from "lucide-react";
 import { usePathname, useParams } from "next/navigation";
 
 export interface DashboardShellProps {
@@ -31,6 +34,8 @@ export function DashboardShell({
   const [drawerClosed, setDrawerClosed] = useState<boolean>(true);
   const { setAllProjects, activeProject, setActiveProject } = useProjectContext();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showCreditPurchase, setShowCreditPurchase] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams<{ projects?: string }>();
@@ -104,6 +109,26 @@ export function DashboardShell({
   const toggleProfileMenu = () => {
     return setShowProfileMenu((prev) => !prev);
   };
+
+  const refreshCreditBalance = async () => {
+    const response = await fetch("/api/credits/balance", { cache: "no-store" });
+    if (!response.ok) throw new Error("Failed to load credits");
+    const data = await response.json();
+    if (data?.success && Number.isFinite(Number(data.balance))) {
+      setCreditBalance(Number(data.balance));
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    refreshCreditBalance()
+      .catch(() => {
+        if (!cancelled) setCreditBalance(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (projects.length === 0) return;
@@ -187,15 +212,10 @@ export function DashboardShell({
           </nav>
 
           {/* Right side: add button, profile icon, user name */}
-          <div className="flex items-center gap-4">
-            {/* <button
-              onClick={() => {
-                router.push("/dashboard/new-project");
-              }}
-              className="px-2 py-1 text-xs border hover:bg-primary/10 border-primary/20 rounded-sm"
-            >
-              + Add a new project
-            </button> */}
+          <div className="flex items-center gap-3 sm:gap-4">
+             <div className="hidden sm:block">
+               <CreditWallet balance={creditBalance} onPurchase={() => setShowCreditPurchase(true)} />
+             </div>
             {/* Profile icon with dropdown */}
             <div
               className="relative"
@@ -208,7 +228,29 @@ export function DashboardShell({
                 </div>
               </div>
               {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg border border-primary/10 rounded-md py-1 z-20">
+                <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-primary/10 bg-card p-1.5 shadow-xl z-20">
+                  <div className="border-b border-primary/10 px-2.5 pb-2 pt-1.5 sm:hidden">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5 text-primary/55">
+                        <Coins className="h-3.5 w-3.5" /> Credits available
+                      </span>
+                      <span className="font-semibold tabular-nums text-primary/90">
+                        {creditBalance === null ? "Loading…" : creditBalance.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setShowCreditPurchase(true);
+                        }}
+                        className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-2 py-2 text-xs font-medium text-primary-foreground"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Buy credits
+                      </button>
+                    </div>
+                  </div>
                   {profileNav &&
                     profileNav.map((item) => {
                       return (
@@ -229,6 +271,15 @@ export function DashboardShell({
         </div>
         <div className="p-5">{children}</div>
       </div>
+      <CreditPurchaseModal
+        open={showCreditPurchase}
+        onOpenChange={setShowCreditPurchase}
+        requiredCredits={1}
+        purchaseMode="wallet"
+        onPaymentSuccess={async () => {
+          await refreshCreditBalance();
+        }}
+      />
     </div>
   );
 }

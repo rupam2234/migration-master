@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { isShopifyProject } from "@/lib/dashboard-routes";
 import { requiresScope, scopeStorageKey } from "@/lib/sharedResources";
-import { recordId, type ExportDirection, type SnapshotMeta } from "./export-config";
-import { loadAllRecordIds, loadWorkingRows, requestSnapshot } from "./export-api";
+import { getDisplayColumns, recordId, type ExportDirection, type SnapshotMeta } from "./export-config";
+import { loadAllRecordIds, loadOwnershipSummary, loadWorkingRows, requestSnapshot, type OwnershipSummary } from "./export-api";
 
 export type UseExportRecordsArgs = {
   activeProject: string | null;
@@ -28,6 +28,12 @@ export function useExportRecords({
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [ownership, setOwnership] = useState<OwnershipSummary>({
+    selectedCount: 0,
+    ownedCount: 0,
+    newCount: 0,
+  });
+  const [ownershipLoading, setOwnershipLoading] = useState(false);
 
   const exportDirection: ExportDirection = isShopifyProject(activeProject)
     ? "shopify_to_wp"
@@ -74,6 +80,7 @@ export function useExportRecords({
           direction: exportDirection,
           resource: resourceParam,
           blogId: resourceScope,
+          preview: !localRows,
         });
         if (cancelled) return;
 
@@ -133,11 +140,10 @@ export function useExportRecords({
     return Array.isArray(selectedData) ? selectedData : [selectedData];
   }, [selectedData]);
 
-  const columns = useMemo(() => {
-    const keys = new Set<string>();
-    records.forEach((r) => Object.keys(r as object).forEach((k) => keys.add(k)));
-    return Array.from(keys);
-  }, [records]);
+  const columns = useMemo(
+    () => getDisplayColumns(records, resourceKey),
+    [records, resourceKey],
+  );
 
   const filtered = useMemo(() => {
     if (!search) return records;
@@ -178,6 +184,42 @@ export function useExportRecords({
       .filter(Boolean);
   }, [includeAll, allRecordIds, records, selected]);
 
+  useEffect(() => {
+    if (!activeProject || selectedIds.length === 0) {
+      setOwnership({ selectedCount: 0, ownedCount: 0, newCount: 0 });
+      setOwnershipLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setOwnershipLoading(true);
+    const timer = setTimeout(() => {
+      loadOwnershipSummary({
+        project: activeProject,
+        direction: exportDirection,
+        resource: resourceParam,
+        itemIds: selectedIds,
+      })
+        .then((summary) => {
+          if (!cancelled) {
+            setOwnership(summary);
+            setOwnershipLoading(false);
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setSnapshotError(error?.message ?? "We couldn’t check the selected records.");
+            setOwnershipLoading(false);
+          }
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // Ownership changes with the current selection, not the full record array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject, exportDirection, resourceParam, selectedIds.join("|")]);
+
   const refreshSnapshot = async () => {
     if (!activeProject || refreshing) return;
     setRefreshing(true);
@@ -188,6 +230,7 @@ export function useExportRecords({
         resource: resourceParam,
         refresh: true,
         blogId: resourceScope,
+        preview: true,
       });
       if (!res.ok) {
         setSnapshotError(data?.message ?? "Failed to refresh records");
@@ -227,6 +270,8 @@ export function useExportRecords({
     setSelected,
     snapshot,
     snapshotError,
+    snapshotReady:
+      Boolean(snapshot?.id) && !snapshotError && !refreshing,
     initialLoading,
     refreshing,
     hasUnshownRecords,
@@ -236,6 +281,8 @@ export function useExportRecords({
     idsLoading: includeAll && !allRecordIds,
     selectedIds,
     selectedCount: selectedIds.length,
+    ownership,
+    ownershipLoading,
     refreshSnapshot,
   };
 }

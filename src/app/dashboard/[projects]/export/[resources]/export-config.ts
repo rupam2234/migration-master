@@ -29,6 +29,62 @@ export const PAGE_FETCH_CONCURRENCY = 5;
 
 export type ExportDirection = "shopify_to_wp" | "wp_to_shopify";
 
+export const MAX_TABLE_COLUMNS = 8;
+
+/** Preferred product fields, in the order merchants need to scan them. */
+const PRODUCT_COLUMN_PRIORITY = [
+  "id",
+  "title",
+  "handle",
+  "status",
+  "vendor",
+  "product_type",
+  "tags",
+  "updated_at",
+];
+
+const COLUMN_ALIASES: Record<string, string> = {
+  ID: "id",
+  Title: "title",
+  Name: "name",
+  Slug: "slug",
+  Handle: "handle",
+  Status: "status",
+  Vendor: "vendor",
+  Type: "type",
+  ProductType: "product_type",
+  Tags: "tags",
+  SKU: "sku",
+  Price: "price",
+  Stock: "stock",
+  UpdatedAt: "updated_at",
+  DateModified: "date_modified",
+};
+
+export function getDisplayColumns(records: any[], resourceKey: string): string[] {
+  const keys = Array.from(
+    new Set(records.flatMap((record) => Object.keys(record as object))),
+  );
+  const canonical = new Map(
+    keys.map((key) => [COLUMN_ALIASES[key] ?? key, key]),
+  );
+  const priority = resourceKey === "PRODUCTS"
+    ? PRODUCT_COLUMN_PRIORITY
+    : ["id", "name", "title", "slug", "handle", "status", "updated_at", "date_modified"];
+
+  const selected: string[] = [];
+  for (const key of priority) {
+    const actual = canonical.get(key);
+    if (actual && !selected.includes(actual)) selected.push(actual);
+  }
+  for (const key of keys) {
+    if (selected.length >= MAX_TABLE_COLUMNS) break;
+    if (!selected.includes(key)) selected.push(key);
+  }
+  return selected.slice(0, MAX_TABLE_COLUMNS);
+}
+
+
 export type PipelineState = {
   phase: "idle" | "uploading" | "processing" | "downloading" | "error";
   uploaded: number;

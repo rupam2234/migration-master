@@ -29,14 +29,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Delete project data safely
+    // Delete project data safely. Pipeline batches and parts cascade.
     await pool.query(
-      `DELETE FROM exported_items WHERE shop_domain = $1`,
-      [shopDomain]
-    );
-    await pool.query(
-      `DELETE FROM export_jobs WHERE shop_domain = $1`,
-      [shopDomain]
+      `DELETE FROM export_pipeline_jobs WHERE project = $1 AND user_id = $2`,
+      [shopDomain, user.id]
     );
     await pool.query(
       `DELETE FROM shopify."Session" WHERE shop = $1`,

@@ -20,14 +20,58 @@ type SnapshotResponse = {
   data: any;
 };
 
+const SNAPSHOT_REQUEST_CACHE_MS = 30_000;
+const snapshotRequestCache = new Map<
+  string,
+  { expiresAt: number; promise: Promise<SnapshotResponse> }
+>();
+
+function snapshotCacheKey(body: SnapshotRequest): string {
+  return JSON.stringify({
+    project: body.project,
+    direction: body.direction,
+    resource: body.resource,
+    refresh: body.refresh ?? false,
+    blogId: body.blogId ?? null,
+    preview: body.preview ?? true,
+  });
+}
+
 /**
  * Creates (or reuses) the server-side snapshot for a resource.
  *
  * A concurrent fetch (React StrictMode's double mount, a double-click, or a
- * second tab) is answered with 409 + a retry hint; honour that hint once
- * instead of showing the user a transient error.
+ * second tab) shares the same in-flight promise. The server-side Redis lock
+ * remains the authority across tabs and server instances.
  */
 export async function requestSnapshot(
+  body: SnapshotRequest,
+): Promise<SnapshotResponse> {
+  const key = snapshotCacheKey(body);
+  const cached = snapshotRequestCache.get(key);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    snapshotRequestCache.delete(key);
+    return cached.promise;
+  }
+
+  const promise = requestSnapshotUncached(body);
+  snapshotRequestCache.set(key, {
+    expiresAt: Date.now() + SNAPSHOT_REQUEST_CACHE_MS,
+    promise,
+  });
+
+  try {
+    return await promise;
+  } finally {
+    const current = snapshotRequestCache.get(key);
+    if (current?.promise === promise) {
+      snapshotRequestCache.delete(key);
+    }
+  }
+}
+
+async function requestSnapshotUncached(
   body: SnapshotRequest,
 ): Promise<SnapshotResponse> {
   const post = () =>
@@ -94,6 +138,30 @@ export async function loadWorkingRows(
 }
 
 /** Fetches every id in a snapshot (ids only — payload stays small). */
+export type OwnershipSummary = {
+  selectedCount: number;
+  ownedCount: number;
+  newCount: number;
+};
+
+export async function loadOwnershipSummary(input: {
+  project: string;
+  direction: ExportDirection;
+  resource: string;
+  itemIds: string[];
+}): Promise<OwnershipSummary> {
+  const res = await fetch("/api/export-ownership", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    throw new Error(data?.message ?? "We couldn’t check the selected records.");
+  }
+  return data;
+}
+
 export async function loadAllRecordIds(snapshotId: string): Promise<string[]> {
   const res = await fetch(`/api/snapshots/${snapshotId}?ids=1`);
   const data = await res.json().catch(() => null);
@@ -103,43 +171,4 @@ export async function loadAllRecordIds(snapshotId: string): Promise<string[]> {
   }
 
   return Array.isArray(data.ids) ? data.ids : [];
-}
-
-export type ExportEligibility = {
-  allOwned: boolean;
-  newItemIds: string[];
-  currency: "USD" | "INR";
-  exchangeRate: number;
-  freeDownloadsUsed: number;
-  freeDownloadsLimit: number;
-  eligibleForFree: boolean;
-};
-
-/** Asks the payment gate whether the selected ids are free, owned, or billable. */
-export async function checkExportEligibility(args: {
-  shopDomain: string;
-  resource: string;
-  itemIds: string[];
-}): Promise<ExportEligibility> {
-  const res = await fetch("/api/payment/check-export", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
-  });
-  const data = await res.json();
-
-  return {
-    allOwned: Boolean(data.allOwned),
-    newItemIds: data.newItemIds ?? [],
-    currency: data.currency ?? "USD",
-    exchangeRate: data.exchangeRate ?? 83,
-    freeDownloadsUsed:
-      data.freeDownloadsUsed ??
-      data.freeCount ??
-      (data.remainingFreeExports != null
-        ? Math.max(0, 3 - data.remainingFreeExports)
-        : 0),
-    freeDownloadsLimit: data.freeDownloadsLimit ?? 3,
-    eligibleForFree: data.eligibleForFree ?? false,
-  };
 }
